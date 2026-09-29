@@ -1,0 +1,3157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마구마구 야구 ⚾</title>
+  <script src="/tailwind.js"></script>
+  <style>
+    body { font-family: 'Jua', 'Do Hyeon', sans-serif; user-select: none; background: #020617; }
+    .hud-title { font-family: 'Do Hyeon', sans-serif; }
+    .digital-font { font-family: 'Chakra Petch', monospace; }
+    .crt-scanline {
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0),
+        rgba(255,255,255,0) 50%,
+        rgba(0, 0, 0, 0.22) 50%,
+        rgba(0, 0, 0, 0.22)
+      );
+      background-size: 100% 4px;
+      pointer-events: none;
+    }
+    .glow-box { box-shadow: 0 0 18px rgba(34, 197, 94, 0.35); }
+    .panel-off { opacity: 0.35; pointer-events: none; }
+    #canvasFrame { transition: border-color 0.4s, box-shadow 0.4s; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-2 overflow-x-hidden">
+
+  <div class="w-full max-w-6xl flex flex-col items-center gap-2">
+
+    <!-- 헤더 -->
+    <header class="w-full flex items-center justify-between px-4 py-2 bg-slate-900 rounded-xl border border-slate-700 glow-box">
+      <div class="flex items-center gap-2">
+        <span class="text-3xl animate-bounce">⚾</span>
+        <div>
+          <h1 class="text-lg sm:text-xl text-yellow-400 font-bold tracking-wider hud-title">마구마구 야구</h1>
+          <p id="modeSubtitle" class="text-[11px] text-emerald-400">AI 대전 · 1대1 대전</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="newGameBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg border border-emerald-400 shadow transition-all">
+          🏠 메인
+        </button>
+        <button id="soundBtn" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-xs text-yellow-400 border border-yellow-500/50 font-bold">
+          🔊 소리 ON
+        </button>
+      </div>
+    </header>
+
+    <!-- 스코어보드 & 상황판 -->
+    <div class="w-full bg-slate-900/95 rounded-xl p-3 border border-slate-700 flex flex-wrap items-center justify-between gap-3 shadow-md">
+      <div class="flex items-center gap-4">
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span id="awayLabel" class="text-xs text-sky-400 w-24 font-bold truncate">AI (원정)</span>
+            <span id="scoreAway" class="digital-font text-lg text-white font-bold bg-slate-800 px-2.5 py-0.5 rounded border border-slate-700">0</span>
+          </div>
+          <div class="flex items-center gap-2 mt-1">
+            <span id="homeLabel" class="text-xs text-emerald-400 w-24 font-bold truncate">나 (홈)</span>
+            <span id="scoreHome" class="digital-font text-lg text-emerald-300 font-bold bg-slate-800 px-2.5 py-0.5 rounded border border-slate-700">0</span>
+          </div>
+        </div>
+
+        <div class="h-10 w-[1px] bg-slate-700 hidden sm:block"></div>
+
+        <div class="flex flex-col text-xs font-sans">
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-400">이닝:</span>
+            <span id="inningDisplay" class="text-yellow-400 font-bold">1회초</span>
+          </div>
+          <div class="flex items-center gap-1.5 mt-0.5">
+            <span class="text-slate-400">내 역할:</span>
+            <span id="myRoleBadge" class="text-sky-400 font-bold bg-slate-800 px-1.5 py-0.5 rounded">🧢 수비 (투수)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-center justify-center">
+        <div id="stepInstruction" class="text-xs sm:text-sm font-bold text-emerald-400 bg-slate-950 px-3 py-1 rounded-full border border-emerald-500/50 text-center">
+          [투수] 구종을 고르고 탄착점을 클릭한 뒤 SPACE!
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+        <div class="flex flex-col gap-1 text-[11px] font-bold font-mono">
+          <div class="flex items-center gap-1">
+            <span class="text-green-500 w-3 font-bold">B</span>
+            <div class="flex gap-1" id="ballDots">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-yellow-400 w-3 font-bold">S</span>
+            <div class="flex gap-1" id="strikeDots">
+              <span></span><span></span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-red-500 w-3 font-bold">O</span>
+            <div class="flex gap-1" id="outDots">
+              <span></span><span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="relative w-12 h-12 flex items-center justify-center">
+          <div class="w-8 h-8 border border-slate-600 rotate-45 absolute"></div>
+          <div id="base2" class="w-3 h-3 bg-slate-800 border border-slate-500 rotate-45 absolute -top-0.5"></div>
+          <div id="base3" class="w-3 h-3 bg-slate-800 border border-slate-500 rotate-45 absolute -left-0.5"></div>
+          <div id="base1" class="w-3 h-3 bg-slate-800 border border-slate-500 rotate-45 absolute -right-0.5"></div>
+          <div class="w-3 h-3 bg-slate-300 border border-white rotate-45 absolute -bottom-0.5"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 구속 게이지 + 투수 체력 -->
+    <div id="meterContainer" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 flex flex-col gap-1">
+      <div class="flex justify-between items-center text-xs">
+        <span class="text-slate-400 font-bold">구속 게이지: <span id="pitcherQualityText" class="text-yellow-300">대기 중</span></span>
+        <span class="text-[11px] text-slate-400 font-sans hidden sm:inline">많이 채울수록 빠른 공 · 세게 던질수록 체력 소모 ↑ · 체력이 낮으면 실투 ↑</span>
+      </div>
+      <div class="relative w-full h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-700">
+        <div id="pitchMeterBar" class="h-full bg-gradient-to-r from-sky-600 via-yellow-400 to-red-500 w-0"></div>
+        <div id="meterMarker" class="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_8px_#ffffff] left-0 pointer-events-none"></div>
+      </div>
+      <div class="flex items-center gap-2 text-xs mt-0.5">
+        <span id="staminaLabel" class="text-slate-400 font-bold w-24 shrink-0">내 투수 체력</span>
+        <div class="relative flex-1 h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-700">
+          <div id="staminaBar" class="h-full bg-emerald-500 transition-all" style="width:100%"></div>
+        </div>
+        <span id="staminaText" class="digital-font text-slate-200 w-16 text-right shrink-0">100</span>
+      </div>
+    </div>
+
+    <!-- 캔버스 화면 (테두리 색: 수비=하늘색, 공격=주황색) -->
+    <div id="canvasFrame" class="relative w-full mx-auto aspect-[26/15] bg-slate-900 rounded-xl overflow-hidden border-4 border-sky-500 shadow-2xl flex items-center justify-center">
+      <canvas id="gameCanvas" width="1040" height="600" class="w-full h-full block cursor-pointer"></canvas>
+      <div class="crt-scanline absolute inset-0"></div>
+
+      <div id="alertBanner" class="absolute top-5 px-5 py-2 rounded-xl bg-black/90 border-2 border-yellow-400 text-yellow-300 font-bold text-sm sm:text-base tracking-wider opacity-0 transition-opacity duration-200 pointer-events-none text-center shadow-2xl">
+        플레이 볼!
+      </div>
+
+      <div id="pitchBadges" class="absolute top-4 left-4 flex flex-col gap-1 pointer-events-none">
+        <div id="selectedPitchBadge" class="px-2.5 py-1 rounded bg-black/75 border border-sky-400 text-sky-300 text-xs font-bold">
+          선택 구종: 직구
+        </div>
+        <div id="batSwingModeBadge" class="px-2.5 py-1 rounded bg-black/75 border border-amber-400 text-amber-300 text-xs font-bold">
+          타격 모드: 컨택트 스윙
+        </div>
+      </div>
+
+      <!-- 메인 화면: 모드 선택 -->
+      <div id="menuModal" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-5 p-4 z-50">
+        <h2 class="text-3xl sm:text-5xl text-yellow-400 font-bold hud-title">⚾ 마구마구 야구</h2>
+        <p id="menuName" class="text-sm text-slate-300 font-sans">접속 중...</p>
+        <div class="flex flex-col sm:flex-row gap-3 w-full max-w-lg">
+          <button id="menuAiBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 border-2 border-emerald-300 rounded-xl py-4 px-3 text-white font-bold hover:scale-105 active:scale-95 transition-all">
+            <span class="block text-2xl">🤖 AI 대전</span>
+            <span class="block text-xs text-emerald-100 font-sans mt-1">혼자서 AI 봇과 3이닝</span>
+          </button>
+          <button id="menuVsBtn" class="flex-1 bg-sky-600 hover:bg-sky-500 border-2 border-sky-300 rounded-xl py-4 px-3 text-white font-bold hover:scale-105 active:scale-95 transition-all">
+            <span class="block text-2xl">⚔️ 1대1 대전</span>
+            <span class="block text-xs text-sky-100 font-sans mt-1">채널 친구와 대결 · 나머지는 관전</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 1대1 로비: 자리 고르기 -->
+      <div id="lobbyModal" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-center gap-3 p-4 z-50 hidden">
+        <h2 class="text-2xl sm:text-3xl text-yellow-400 font-bold hud-title">⚔️ 1대1 대전 로비</h2>
+        <div class="grid grid-cols-2 gap-2 w-full max-w-md">
+          <button id="seatHome" class="seat-btn rounded-xl border-2 p-2 text-left"></button>
+          <button id="seatAway" class="seat-btn rounded-xl border-2 p-2 text-left"></button>
+        </div>
+        <div class="grid grid-cols-2 gap-2 w-full max-w-md">
+          <div class="grid grid-cols-2 gap-1">
+            <button data-throw="R" class="hand-btn">우투</button>
+            <button data-throw="L" class="hand-btn">좌투</button>
+          </div>
+          <div class="grid grid-cols-2 gap-1">
+            <button data-bat="R" class="hand-btn">우타</button>
+            <button data-bat="L" class="hand-btn">좌타</button>
+          </div>
+        </div>
+        <p id="lobbyList" class="text-xs text-slate-400 font-sans text-center max-w-md"></p>
+        <div class="flex gap-2">
+          <button id="lobbyBackBtn" class="text-sm bg-slate-700 hover:bg-slate-600 text-slate-100 font-bold px-4 py-2 rounded-lg">← 메인</button>
+          <button id="lobbyStartBtn" class="text-sm bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:pointer-events-none text-slate-950 font-bold px-6 py-2 rounded-lg shadow-lg">경기 시작 ⚾</button>
+        </div>
+        <p class="text-[11px] text-slate-500 font-sans text-center max-w-md">빈 자리를 눌러 앉으세요. 두 자리가 차면 경기 시작! 자리에 앉지 않은 사람은 자동으로 관전합니다.</p>
+      </div>
+
+      <!-- 경기 전 선수 설정 (AI 대전) -->
+      <div id="setupModal" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center gap-4 p-4 z-40 hidden">
+        <h2 class="text-2xl sm:text-3xl text-yellow-400 font-bold hud-title">선수 설정 ⚾</h2>
+        <div class="flex flex-col gap-3 w-full max-w-sm">
+          <div>
+            <p class="text-sm text-sky-300 font-bold mb-1">🧢 내 투수: 던지는 손</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button data-throw="R" class="hand-btn">우투 (오른손)</button>
+              <button data-throw="L" class="hand-btn">좌투 (왼손)</button>
+            </div>
+          </div>
+          <div>
+            <p class="text-sm text-amber-300 font-bold mb-1">🏏 내 타자: 타석</p>
+            <div class="grid grid-cols-2 gap-2">
+              <button data-bat="R" class="hand-btn">우타 (오른쪽 타석)</button>
+              <button data-bat="L" class="hand-btn">좌타 (왼쪽 타석)</button>
+            </div>
+          </div>
+        </div>
+        <p class="text-[11px] text-slate-400 text-center max-w-sm font-sans leading-relaxed">
+          좌투수는 변화구가 반대 방향으로 꺾입니다. 우타자는 일찍 치면 좌측, 좌타자는 일찍 치면 우측으로 당겨지고,
+          좌타자는 1루가 가까워 조금 더 빨리 출루합니다. AI 선수의 손은 무작위로 정해집니다.
+        </p>
+        <button id="startGameBtn" class="text-sm bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-8 py-2.5 rounded-lg shadow-lg hover:scale-105 active:scale-95 transition-all">
+          경기 시작 ⚾
+        </button>
+      </div>
+
+      <div id="gameOverModal" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-center gap-4 p-4 z-30 hidden">
+        <h2 id="modalResultTitle" class="text-2xl sm:text-3xl text-yellow-400 font-bold hud-title text-center leading-relaxed">경기 종료</h2>
+        <p id="modalResultDesc" class="text-sm text-slate-300 text-center font-sans max-w-md leading-relaxed"></p>
+        <button id="restartBtn" class="mt-2 text-sm bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-2.5 rounded-lg shadow-lg hover:scale-105 active:scale-95 transition-all">
+          새 경기 시작하기 ⚾
+        </button>
+      </div>
+    </div>
+
+    <!-- 컨트롤 패널 -->
+    <div class="w-full grid grid-cols-1 md:grid-cols-2 gap-2 bg-slate-900/90 rounded-xl p-3 border border-slate-700">
+      <div id="pitcherPanel" class="flex flex-col gap-1.5 p-2 bg-slate-950/80 rounded-lg border border-slate-800 transition-opacity">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-sky-400 flex items-center gap-1">
+            <span>🧢</span> [수비] 투구 & 수비
+          </span>
+          <span class="text-[10px] text-slate-400 font-sans">[1~7] 구종 / 클릭=탄착점</span>
+        </div>
+
+        <div class="grid grid-cols-4 gap-1.5">
+          <button data-pitch="FASTBALL" class="pitch-btn text-xs py-1.5 rounded font-bold border">1. 직구</button>
+          <button data-pitch="SLIDER" class="pitch-btn text-xs py-1.5 rounded font-bold border">2. 슬라이더</button>
+          <button data-pitch="CURVE" class="pitch-btn text-xs py-1.5 rounded font-bold border">3. 커브</button>
+          <button data-pitch="FORK" class="pitch-btn text-xs py-1.5 rounded font-bold border">4. 포크</button>
+          <button data-pitch="CHANGEUP" class="pitch-btn text-xs py-1.5 rounded font-bold border">5. 체인지업</button>
+          <button data-pitch="CUTTER" class="pitch-btn text-xs py-1.5 rounded font-bold border">6. 커터</button>
+          <button data-pitch="SINKER" class="pitch-btn text-xs py-1.5 rounded font-bold border">7. 투심</button>
+        </div>
+
+        <div class="flex items-center gap-2 mt-1">
+          <button id="lockPitchBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 rounded text-xs transition-colors">🎯 게이지 시작 (SPACE)</button>
+          <button id="stopMeterBtn" class="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1.5 rounded text-xs transition-colors">⏹️ 게이지 멈추기 (SPACE)</button>
+        </div>
+
+        <details class="text-[11px] text-slate-400 font-sans bg-slate-900 p-1.5 rounded border border-slate-800"><summary class="cursor-pointer text-slate-300 font-bold">❓ 조작법 보기</summary>
+          * 타구가 나가면 필드 화면으로 바뀝니다. <b class="text-sky-300">방향키</b>로 노란 표시 수비수를 움직이고(가만두면 자동),
+          공을 잡으면 <b class="text-sky-300">1=1루 2=2루 3=3루 4=홈</b> 또는 베이스 클릭으로 송구하세요. 2루 → 1루로 이어 던지면 병살!
+        </details>
+      </div>
+
+      <div id="batterPanel" class="flex flex-col gap-1.5 p-2 bg-slate-950/80 rounded-lg border border-slate-800 transition-opacity">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-amber-400 flex items-center gap-1">
+            <span>🏏</span> [공격] 구역 노림 & 타격
+          </span>
+          <span class="text-[10px] text-slate-400 font-sans">방향키=구역 / [Z]=스윙 / [X]=모드</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button id="swingModeBtn" class="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs py-1.5 rounded font-bold transition-all">타격모드: 컨택트 [X]</button>
+          <button id="buntBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-amber-200 text-xs py-1.5 rounded font-bold transition-all border border-amber-500/50">🙇 번트 자세 [B]</button>
+          <button id="stealBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-sky-200 text-xs py-1.5 rounded font-bold transition-all border border-sky-500/50">🏃 도루·추가진루 [S]</button>
+          <button id="swingHitBtn" class="flex-1 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-bold py-1.5 rounded text-xs transition-all shadow-md">💥 스윙! [Z / SPACE]</button>
+        </div>
+
+        <details class="text-[11px] text-slate-400 font-sans bg-slate-900 p-1.5 rounded border border-slate-800"><summary class="cursor-pointer text-slate-300 font-bold">❓ 조작법 보기</summary>
+          * 존은 9칸입니다. 컨택트는 2×2칸 크기 사각형, 강공(X로 전환)은 1칸을 방향키(한 번에 한 칸)나 클릭으로 골라 두고,
+          공이 그 안에 들어올 때 타이밍 맞춰 Z! 강공은 범위가 작은 대신 장타가 잘 나옵니다. 날아오는 중에 화면을 클릭해도 스윙합니다.
+          칸 가운데일수록 정타, 공이 칸 위쪽이면 뜬공·아래쪽이면 땅볼, 일찍 치면 당겨치기·늦으면 밀어치기.
+          번트 자세에서는 공이 올 때 Z로 배트를 대면 약하게 굴러갑니다 (공 아래를 대면 뜨고, 2스트라이크 번트 파울은 삼진).
+          도루(S)는 공이 투수 손을 떠나기 전에 거세요. 느린 공일 때 뛰면 살기 쉽고, 치면 히트앤드런이 됩니다.
+        </details>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    class SoundEngine {
+      constructor() { this.ctx = null; this.enabled = true; }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContext) return false;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        return true;
+      }
+      ready() { return this.enabled && this.init(); }
+      // 나무 배트 "딱!": 아주 짧은 파열음(노이즈) + 나무가 울리는 높은 음 + 묵직한 저음.
+      // quality(0~1)가 높을수록(정타일수록) 크고 맑게 울립니다.
+      playBatCrack(quality = 0.7) {
+        if (!this.ready()) return;
+        const c = this.ctx, t = c.currentTime, out = c.createGain();
+        out.gain.value = 0.55 + quality * 0.45;
+        out.connect(c.destination);
+        // 1) 파열음: 30ms 노이즈를 고역 대역으로
+        const len = Math.floor(c.sampleRate * 0.05);
+        const buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+        const noise = c.createBufferSource(); noise.buffer = buf;
+        const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400 + quality * 800; bp.Q.value = 0.9;
+        const ng = c.createGain(); ng.gain.setValueAtTime(1.4, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+        noise.connect(bp); bp.connect(ng); ng.connect(out); noise.start(t);
+        // 2) 나무 울림: 높은 음이 빠르게 떨어짐 (정타일수록 오래 울림)
+        const ring = c.createOscillator(), rg = c.createGain();
+        ring.type = 'triangle';
+        ring.frequency.setValueAtTime(1500 + quality * 500, t);
+        ring.frequency.exponentialRampToValueAtTime(700, t + 0.06);
+        rg.gain.setValueAtTime(0.5, t); rg.gain.exponentialRampToValueAtTime(0.001, t + 0.05 + quality * 0.07);
+        ring.connect(rg); rg.connect(out); ring.start(t); ring.stop(t + 0.14);
+        // 3) 묵직한 타격감
+        const thump = c.createOscillator(), tg = c.createGain();
+        thump.type = 'sine';
+        thump.frequency.setValueAtTime(180, t); thump.frequency.exponentialRampToValueAtTime(60, t + 0.09);
+        tg.gain.setValueAtTime(0.9, t); tg.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+        thump.connect(tg); tg.connect(out); thump.start(t); thump.stop(t + 0.11);
+      }
+      // 번트 "톡": 짧고 둔한 나무 소리
+      playBuntTap() {
+        if (!this.ready()) return;
+        const c = this.ctx, t = c.currentTime;
+        const osc = c.createOscillator(), g = c.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(900, t); osc.frequency.exponentialRampToValueAtTime(350, t + 0.04);
+        g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+        osc.connect(g); g.connect(c.destination); osc.start(t); osc.stop(t + 0.07);
+      }
+      playCatch() {
+        if (!this.ready()) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(200, t);
+        osc.frequency.exponentialRampToValueAtTime(60, t + 0.06);
+        gain.gain.setValueAtTime(0.6, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.06);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(t); osc.stop(t + 0.06);
+      }
+      playSwingMiss() {
+        if (!this.ready()) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(160, t);
+        osc.frequency.exponentialRampToValueAtTime(320, t + 0.07);
+        osc.frequency.exponentialRampToValueAtTime(80, t + 0.17);
+        gain.gain.setValueAtTime(0.3, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(t); osc.stop(t + 0.18);
+      }
+      playCheer() {
+        if (!this.ready()) return;
+        const t = this.ctx.currentTime;
+        const len = this.ctx.sampleRate * 0.9;
+        const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.35;
+        const noise = this.ctx.createBufferSource(); noise.buffer = buf;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass'; filter.frequency.setValueAtTime(850, t);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.05, t);
+        gain.gain.linearRampToValueAtTime(0.4, t + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.9);
+        noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+        noise.start(t);
+      }
+      playBeep(success = true) {
+        if (!this.ready()) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square'; osc.frequency.setValueAtTime(success ? 600 : 220, t);
+        gain.gain.setValueAtTime(0.15, t); gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(t); osc.stop(t + 0.12);
+      }
+    }
+
+    // 심판 "아웃!" 외침: 톱니파 목소리를 모음 필터(아→우)로 걸러 "아-웃!" 두 음절처럼 들리게
+    SoundEngine.prototype.playUmpire = function () {
+      if (!this.ready()) return;
+      const c = this.ctx, t = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(210, t);
+      o.frequency.linearRampToValueAtTime(260, t + 0.12);
+      o.frequency.setValueAtTime(330, t + 0.16);
+      o.frequency.exponentialRampToValueAtTime(140, t + 0.62);
+      [[850, 420], [1250, 800]].forEach(([a, b]) => {
+        const f = c.createBiquadFilter();
+        f.type = 'bandpass'; f.Q.value = 5;
+        f.frequency.setValueAtTime(a, t + 0.16); f.frequency.exponentialRampToValueAtTime(b, t + 0.3);
+        o.connect(f); f.connect(g);
+      });
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.exponentialRampToValueAtTime(1.4, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.3, t + 0.14);  // "아"와 "웃" 사이 끊김
+      g.gain.exponentialRampToValueAtTime(1.7, t + 0.19);
+      g.gain.setValueAtTime(1.7, t + 0.45);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+      g.connect(c.destination);
+      o.start(t); o.stop(t + 0.7);
+    };
+    // 심판 퇴장 효과음: 슬라이드 휘슬(빙글빙글·옆돌기) / 통통통(깡충) / 뿅뿅(문워크)
+    SoundEngine.prototype.playUmpireExit = function (kind) {
+      if (!this.ready()) return;
+      const c = this.ctx, t = c.currentTime;
+      const o = c.createOscillator(), g = c.createGain(), lfo = c.createOscillator(), lg = c.createGain();
+      o.type = 'sine'; lfo.frequency.value = 9; lg.gain.value = 25;
+      lfo.connect(lg); lg.connect(o.frequency);
+      const f = o.frequency;
+      if (kind === 'hop') [0, 0.25, 0.5].forEach(d => { f.setValueAtTime(260, t + d); f.exponentialRampToValueAtTime(900, t + d + 0.12); f.exponentialRampToValueAtTime(300, t + d + 0.22); });
+      else if (kind === 'moonwalk') [0, 0.18, 0.36, 0.54].forEach((d, i) => f.setValueAtTime(i % 2 ? 520 : 780, t + d));
+      else { f.setValueAtTime(450, t); f.exponentialRampToValueAtTime(1700, t + 0.6); }
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.exponentialRampToValueAtTime(0.35, t + 0.03);
+      g.gain.setValueAtTime(0.35, t + 0.62);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
+      o.connect(g); g.connect(c.destination);
+      o.start(t); lfo.start(t); o.stop(t + 0.76); lfo.stop(t + 0.76);
+    };
+
+    const sound = new SoundEngine();
+
+    // ===== 1대1 대전 네트워크 상태 =====
+    // side: null(AI 대전·로비) | 'home'(호스트: 경기 계산을 전부 하고 상태를 뿌림) | 'away'(상대: 입력만 보내고 화면은 호스트 상태로) | 'spec'(관전)
+    const NET = {
+      ws: null, id: 0, lobby: null, side: null, names: { home: '나', away: 'AI' }, awayHands: null,
+      viewHands: null, events: [], remoteKeys: new Set(), acting: false, meter: 'idle', frame: 0, closing: false,
+    };
+    const isHost = () => NET.side === 'home';
+    const isGuest = () => NET.side === 'away';
+    const isSpec = () => NET.side === 'spec';
+    const versus = () => NET.side !== null;
+    function netSend(msg) { if (NET.ws && NET.ws.readyState === 1) NET.ws.send(JSON.stringify(msg)); }
+    const netInput = m => netSend({ t: 'input', ...m });
+    // 호스트에서 난 소리는 다음 상태 전송 때 같이 보내서 모두가 듣습니다.
+    ['playBatCrack', 'playBuntTap', 'playCatch', 'playSwingMiss', 'playCheer', 'playBeep', 'playUmpire', 'playUmpireExit'].forEach(m => {
+      const f = sound[m].bind(sound);
+      sound[m] = (...a) => { if (isHost()) NET.events.push({ k: 'sound', m, a }); f(...a); };
+    });
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const V_W = 800, V_H = 600;      // 장면 좌표 (가운데 800폭 기준으로 그립니다)
+    const CW = 1040, OX = (CW - V_W) / 2; // 실제 캔버스 폭(가로로 넓힘)과 장면을 가운데로 옮기는 양
+    const fillFull = (y, h) => ctx.fillRect(-OX, y, CW, h); // 배경은 캔버스 전체 폭으로
+    const ZONE = { x: 347.5, y: 321, w: 105, h: 128 }; // 가운데(400, 385) 기준 75% 크기
+    const ZONE_CENTER = { x: ZONE.x + ZONE.w / 2, y: ZONE.y + ZONE.h / 2 };
+    const TOTAL_INNINGS = 3;
+    const IDEAL_HIT_PROGRESS = 1.0;  // 공이 홈플레이트(목표 지점)에 닿는 순간이 최적 타이밍
+    const CATCH_PROGRESS = 1.12;     // 이 시점까지 안 치면 포수 미트에 들어간 것으로 판정
+    const FRAME_MS = 1000 / 60;      // 물리는 초당 60번 고정으로 계산 (모니터 주사율과 무관)
+    const STEP = 1 / 60;
+    // 공이 투수 손을 떠나 홈플레이트까지 걸리는 시간(초). 구속 차이가 눈에 띄도록 실제보다 과장합니다.
+    // 156km/h ≈ 0.6초, 145km/h ≈ 0.72초, 130km/h ≈ 0.9초, 115km/h ≈ 1.2초, 100km/h ≈ 1.6초
+    const flightSeconds = kmh => 0.72 * Math.pow(145 / kmh, 2.2);
+    const DELIVERY = 0.24;               // 게이지를 멈춘 뒤 투수가 팔을 휘둘러 공을 놓기까지 걸리는 시간(초)
+
+    // 구종별 변화: 공은 처음에 (목표 - 변화량) 쪽으로 날아오다가 막판에 목표 지점으로 꺾여 들어갑니다.
+    // breakPow가 클수록 더 늦게, 더 급격하게 꺾입니다. 구속(km/h)이 빠를수록 공이 빨리 도착합니다.
+    // kmh: 게이지를 거의 안 채웠을 때 ~ 끝까지(92%) 채웠을 때의 구속. color: 투구 궤적 색
+    const PITCHES = {
+      FASTBALL: { name: '직구', kmh: [128, 156], breakX: 0, breakY: 0, pow: 1, color: '#f8fafc' },
+      SLIDER:   { name: '슬라이더', kmh: [116, 140], breakX: 34, niceBreakX: 48, breakY: 10, pow: 3, color: '#60a5fa' },
+      CURVE:    { name: '커브', kmh: [98, 122], breakX: -26, breakY: 45, niceBreakY: 55, pow: 2, color: '#c084fc' },
+      FORK:     { name: '포크', kmh: [114, 139], breakX: 0, breakY: 38, niceBreakY: 56, pow: 4, color: '#f472b6' },
+      // 체인지업: 직구처럼 오다가 느리고 팔 쪽(-)으로 흐르며 떨어짐 / 커터: 빠르고 막판에 글러브 쪽(+)으로 살짝
+      // 투심: 빠르면서 팔 쪽으로 휘며 가라앉음
+      CHANGEUP: { name: '체인지업', kmh: [108, 132], breakX: -16, niceBreakX: -24, breakY: 28, niceBreakY: 38, pow: 3, color: '#34d399' },
+      CUTTER:   { name: '커터', kmh: [124, 147], breakX: 14, niceBreakX: 22, breakY: 4, pow: 5, color: '#fbbf24' },
+      SINKER:   { name: '투심', kmh: [126, 151], breakX: -14, niceBreakX: -20, breakY: 16, niceBreakY: 24, pow: 2, color: '#fb923c' },
+    };
+
+    // 게이지는 구속만 정합니다: 0% = 최저, 100% = 최고 구속. 체력이 떨어지면 최고 구속도 조금 떨어집니다.
+    function kmhFromMeter(type, val, stamina = 100) {
+      const [lo, hi] = PITCHES[type].kmh;
+      return Math.round(lo + (hi - lo) * clamp(val / 100, 0, 1) - (1 - stamina / 100) * 8);
+    }
+
+    // ===== 투수 체력 =====
+    // 공을 던질 때마다 줄고(세게 던질수록 많이), 한 이닝을 쉬면 조금 회복합니다.
+    // 체력이 낮을수록 제구가 흔들리고, 변화구가 덜 꺾이고, 실투가 잦아집니다.
+    const staminaCost = meterVal => 2.0 + 3.0 * (meterVal / 100) ** 2;
+    function mistakeChance(stamina, meterVal) {
+      const tired = 1 - stamina / 100;
+      // 싱싱할 땐 거의 없고, 지칠수록 급격히 늘어납니다 (체력 50 ≈ 23%, 30 ≈ 44%, 10 ≈ 74%)
+      return clamp(0.03 + 0.9 * Math.pow(tired, 2.2) + (meterVal > 90 ? 0.05 : 0), 0, 0.8);
+    }
+
+    // ===== 수비 장면 상수 (단위: 피트·초, 홈플레이트가 원점, +y는 중견수 방향, +x는 1루 방향) =====
+    const G = 32.2, DRAG = 0.0022, LIFT = 0.16; // 공기저항 + 역회전으로 뜨는 힘 (발사각이 클수록 강함)
+    const PLAY_SPEED = 1.3;          // 수비 장면 배속
+    const RUNNER_SPEED = 23, THROW_SPEED = 105, THROW_RELEASE = 0.45;
+    const CATCH_HEIGHT = 8.5, FENCE_H = 10, TAG_DIST = 3.5;
+    const reachFor = z => (z > 1 ? 3.5 : 3); // 수비수가 몸을 뻗어 닿는 거리 (뜬공은 점프·다이빙 포함)
+    const USER_THROW_WAIT = 1.8;     // 내가 수비할 때 송구 방향을 안 고르면 이 시간 뒤 자동 송구
+    const TILT = 0.8;                // 필드를 살짝 비스듬히 내려다보는 시점
+    const BASE_POS = [{ x: 0, y: 0 }, { x: 63.64, y: 63.64 }, { x: 0, y: 127.28 }, { x: -63.64, y: 63.64 }];
+    const BASE_NAMES = ['홈', '1루', '2루', '3루', '홈'];
+    const basePoint = b => BASE_POS[b % 4];
+    const polar = (d, deg) => ({ x: d * Math.sin(deg * Math.PI / 180), y: d * Math.cos(deg * Math.PI / 180) });
+    const fenceDist = ang => 330 + 70 * Math.cos(Math.min(Math.abs(ang), Math.PI / 4) * 2); // 좌우 330ft, 가운데 400ft
+    const dist2d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const FIELDER_SPOTS = [
+      // react: 타구를 보고 움직이기 시작할 때까지 걸리는 시간(초)
+      { label: '투', speed: 16, react: 0.45, ...polar(60.5, 0) },
+      { label: '포', speed: 16, react: 0.45, x: 0, y: -4 },
+      { label: '1', speed: 17, react: 0.45, ...polar(108, 33) },
+      { label: '2', speed: 17, react: 0.5, ...polar(150, 13) },
+      { label: '유', speed: 17, react: 0.5, ...polar(150, -13) },
+      { label: '3', speed: 17, react: 0.45, ...polar(108, -33) },
+      { label: '좌', speed: 20, react: 1.0, ...polar(285, -28) },
+      { label: '중', speed: 21, react: 1.0, ...polar(315, 0) },
+      { label: '우', speed: 20, react: 1.0, ...polar(285, 28) },
+    ];
+
+    const gameState = {
+      token: 0,
+      inning: 1, isTopInning: true, scoreAway: 0, scoreHome: 0,
+      balls: 0, strikes: 0, outs: 0, runners: [false, false, false],
+      isGameOver: false, phase: 'SET_TARGET', myPlayerRole: 'PITCHER',
+      pitch: {
+        type: 'FASTBALL', aimX: ZONE_CENTER.x, aimY: ZONE_CENTER.y,
+        targetX: ZONE_CENTER.x, targetY: ZONE_CENTER.y,
+        meterVal: 0, meterSpeed: 2.1, meterDir: 1, meterActive: false, quality: 'NORMAL',
+        ballX: 400, ballY: 180, startX: 400, startY: 180, progress: 0, kmh: 145, speedShown: false,
+        speed: 0.024, active: false, breakX: 0, breakY: 0, pow: 1, inZone: false, swung: false
+      },
+      batter: {
+        aimX: ZONE_CENTER.x, aimY: ZONE_CENTER.y, mode: 'CONTACT', isSwinging: false,
+        swingFrame: 0, maxSwingFrames: 24, contactRadius: 28, holdFollow: false, swingFrom: 0,
+        quad: { c: 0, r: 1 } // 노리는 칸 (4구역)
+      },
+      ai: { willSwing: false, swingAt: 1 },
+      hitBall: { active: false, x: 400, y: 400, vx: 0, vy: 0, altitude: 0, vz: 0 },
+      feedback: { text: '', color: '#facc15', alpha: 0, x: 400, y: 280 },
+      pitchLog: [],      // 이번 타석의 투구 위치 (번호·판정)
+      newBatter: true,
+      lastCatch: null,   // 포수가 마지막으로 공을 잡은 위치
+      catchAnim: 0,
+      speedGun: null,    // 전광판 구속 표시
+      change: null,      // 공수 교대 연출
+      aiPitcherHand: 'R', aiBatterHand: 'R',
+      stamina: { me: 100, ai: 100 }, // 투수 체력 (내 투수 / AI 투수)
+      steal: null,       // 이번 투구에 걸린 도루 { bases: [1|2...], byAI, speeds, elapsed }
+      meterT: 0,         // 와인드업(게이지) 시작 후 흐른 시간
+      pitcherT: 9,       // 공을 놓은 뒤 흐른 시간 (팔로스루 애니메이션용)
+      lastTrail: null,   // 직전 투구 궤적
+      ump: null,         // 아웃 판정 심판 연출 { t, n, text, pose, exit }
+      shakeTimer: 0
+    };
+
+    // 내 선수의 손 (경기 전에 고름). 'R' = 우투/우타, 'L' = 좌투/좌타
+    const myHands = { throw: 'R', bat: 'R' };
+    try { Object.assign(myHands, JSON.parse(localStorage.getItem('magumagu-hands') || '{}')); } catch (e) {}
+
+    // UI 요소
+    const $ = id => document.getElementById(id);
+    const stepInstruction = $('stepInstruction');
+    const alertBanner = $('alertBanner');
+    const selectedPitchBadge = $('selectedPitchBadge');
+    const batSwingModeBadge = $('batSwingModeBadge');
+    const pitchMeterBar = $('pitchMeterBar');
+    const meterMarker = $('meterMarker');
+    const pitcherQualityText = $('pitcherQualityText');
+    const pitchBtnList = document.querySelectorAll('.pitch-btn');
+    const swingModeBtn = $('swingModeBtn');
+    const soundBtn = $('soundBtn');
+    const ballDots = $('ballDots').children;
+    const strikeDots = $('strikeDots').children;
+    const outDots = $('outDots').children;
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // 정규분포 난수 (AI의 조준·타이밍 오차용)
+    function gauss() {
+      let u = 0, v = 0;
+      while (u === 0) u = Math.random();
+      while (v === 0) v = Math.random();
+      return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+    }
+    // 새 경기를 시작하면 이전 경기에서 예약해 둔 타이머는 무시됩니다.
+    function later(fn, ms) {
+      const token = gameState.token;
+      setTimeout(() => { if (token === gameState.token) fn(); }, ms);
+    }
+    const aiIsBatting = () => gameState.myPlayerRole === 'PITCHER';
+    const aiIsPitching = () => gameState.myPlayerRole === 'BATTER';
+    const userDefending = aiIsBatting;
+    // 입력 권한 확인용 역할: 호스트가 상대 입력을 대신 처리하는 동안(NET.acting)은 반대 역할, 관전자는 권한 없음
+    const myRole = () => (isSpec() ? 'SPECTATOR' : NET.acting ? (gameState.myPlayerRole === 'PITCHER' ? 'BATTER' : 'PITCHER') : gameState.myPlayerRole);
+    const meHands = () => NET.viewHands || myHands;
+    // 수비를 사람이 하는지 (AI 대전은 내가 수비일 때만, 1대1은 항상) 와 그 사람이 누르고 있는 방향키
+    const humanDefending = () => versus() || userDefending();
+    const defenderKeys = () => (isHost() && !userDefending() ? NET.remoteKeys : keysDown);
+    const pitcherHand = () => (aiIsPitching() ? gameState.aiPitcherHand : meHands().throw);
+    const batterHand = () => (aiIsBatting() ? gameState.aiBatterHand : meHands().bat);
+    const oppName = () => (versus() ? '상대' : 'AI');
+    const handLabel = (h, kind) => (h === 'L' ? '좌' : '우') + kind;
+    const staminaKey = () => (aiIsPitching() ? 'ai' : 'me');
+    const currentStamina = () => gameState.stamina[staminaKey()];
+    // 타격 구역: 스트라이크 존은 항상 9칸(3×3). 컨택트·번트는 그중 2×2칸 크기 사각형(위치 4곳),
+    // 강공(파워)은 1칸(위치 9곳)을 고릅니다. c: 왼쪽부터 열, r: 위부터 줄 (사각형 왼쪽 위 칸 기준)
+    const GRID = 3, CELL_W = ZONE.w / GRID, CELL_H = ZONE.h / GRID;
+    const spanOf = mode => (mode === 'POWER' ? 1 : 2);
+    const gridN = mode => GRID - spanOf(mode) + 1; // 고를 수 있는 위치가 한 줄에 몇 개인지
+    const cellRect = (c, r, span) => ({ x: ZONE.x + c * CELL_W, y: ZONE.y + r * CELL_H, w: CELL_W * span, h: CELL_H * span });
+    const cellOf = (x, y, span) => ({ // 이 점을 가운데에 가장 가깝게 담는 사각형 위치
+      c: clamp(Math.round((x - ZONE.x) / CELL_W - span / 2), 0, GRID - span),
+      r: clamp(Math.round((y - ZONE.y) / CELL_H - span / 2), 0, GRID - span),
+    });
+    const quadOf = (x, y) => cellOf(x, y, spanOf(gameState.batter.mode)); // 지금 타격 모드 기준 위치
+    function setBatterQuad(c, r) {
+      const b = gameState.batter, span = spanOf(b.mode);
+      c = clamp(c, 0, GRID - span); r = clamp(r, 0, GRID - span);
+      const q = cellRect(c, r, span);
+      b.quad = { c, r };
+      b.aimX = q.x + q.w / 2; b.aimY = q.y + q.h / 2; // 자세·배트 그리기는 사각형 가운데를 기준으로
+    }
+    const isInZone = (x, y) => x >= ZONE.x - 4 && x <= ZONE.x + ZONE.w + 4 && y >= ZONE.y - 4 && y <= ZONE.y + ZONE.h + 4;
+
+    // local=true면 호스트 화면에만 (상대에게 숨길 알림)
+    function showAlert(text, duration = 1800, local = false) {
+      if (isHost() && !local) NET.events.push({ k: 'alert', text, duration });
+      alertBanner.textContent = text;
+      alertBanner.style.opacity = '1';
+      clearTimeout(alertBanner.timer);
+      alertBanner.timer = setTimeout(() => { alertBanner.style.opacity = '0'; }, duration);
+    }
+
+    function setFeedback(txt, color, x = gameState.batter.aimX, y = gameState.batter.aimY - 25) {
+      Object.assign(gameState.feedback, { text: txt, color, alpha: 1.2, x, y });
+    }
+
+    function updateInstruction() {
+      if (isSpec()) {
+        const g = gameState, pName = g.isTopInning ? NET.names.home : NET.names.away;
+        stepInstruction.textContent = g.phase === 'GAME_OVER' ? '경기 종료!' : `📺 관전 중 · ${pName} 투구 / ${g.isTopInning ? NET.names.away : NET.names.home} 타격`;
+        return;
+      }
+      const pitcher = gameState.myPlayerRole === 'PITCHER', opp = oppName();
+      const texts = {
+        SET_TARGET: pitcher ? '[투수] 1~7로 구종, 클릭으로 탄착점 지정 후 SPACE!' : `[타자] ${opp} 투수 준비 중... 방향키로 노릴 칸을 고르세요`,
+        METER_RUNNING: pitcher ? '[투수] SPACE로 원하는 구속에서 멈추세요!' : `[타자] ${opp} 투수가 와인드업! 준비하세요`,
+        PITCH_FLYING: pitcher ? `투구! ${opp} 타자가 노리고 있습니다...` : '지금! Z / SPACE로 스윙!',
+        BATTED: '타구가 날아갑니다!',
+        FIELD: pitcher ? '[수비] 방향키=수비수 이동 · 1~4 또는 베이스 클릭=송구!' : `[공격] 주자가 달립니다! S=추가 진루 (수비는 ${opp})`,
+        RESOLVED: '판정 중...',
+        CHANGE: '공수 교대!',
+        SETUP: '경기 전: 내 투수·타자의 손을 고르세요',
+        GAME_OVER: '경기 종료!',
+      };
+      stepInstruction.textContent = texts[gameState.phase] || '';
+    }
+
+    function dotClass(on, color) {
+      return `w-2.5 h-2.5 rounded-full ${on ? color : 'bg-slate-800 border border-slate-700'}`;
+    }
+    function baseClass(pos, on) {
+      return `w-3 h-3 rotate-45 absolute ${pos} border ${on ? 'bg-amber-400 border-amber-300 shadow-[0_0_10px_#f59e0b]' : 'bg-slate-800 border-slate-500'}`;
+    }
+
+    function updateScoreboard() {
+      $('scoreAway').textContent = gameState.scoreAway;
+      $('scoreHome').textContent = gameState.scoreHome;
+      $('inningDisplay').textContent = `${gameState.inning}회${gameState.isTopInning ? '초' : '말'}`;
+      const isPitcher = gameState.myPlayerRole === 'PITCHER';
+      const roleBadge = $('myRoleBadge');
+      roleBadge.textContent = isSpec() ? '📺 관전 중' : isPitcher ? '🧢 수비 (투수)' : '🏏 공격 (타자)';
+      roleBadge.className = `${isSpec() ? 'text-slate-300' : isPitcher ? 'text-sky-400' : 'text-amber-400'} font-bold bg-slate-800 px-1.5 py-0.5 rounded`;
+      $('pitcherPanel').classList.toggle('panel-off', !isPitcher || isSpec());
+      $('batterPanel').classList.toggle('panel-off', isPitcher || isSpec());
+      const frame = $('canvasFrame');
+      frame.style.borderColor = isPitcher ? '#0ea5e9' : '#f59e0b';
+      frame.style.boxShadow = `0 0 24px ${isPitcher ? 'rgba(14,165,233,0.45)' : 'rgba(245,158,11,0.45)'}`;
+
+      for (let i = 0; i < 3; i++) ballDots[i].className = dotClass(i < gameState.balls, 'bg-green-400 shadow-[0_0_8px_#4ade80]');
+      for (let i = 0; i < 2; i++) strikeDots[i].className = dotClass(i < gameState.strikes, 'bg-yellow-400 shadow-[0_0_8px_#facc15]');
+      for (let i = 0; i < 2; i++) outDots[i].className = dotClass(i < gameState.outs, 'bg-red-500 shadow-[0_0_8px_#ef4444]');
+
+      $('base1').className = baseClass('-right-0.5', gameState.runners[0]);
+      $('base2').className = baseClass('-top-0.5', gameState.runners[1]);
+      $('base3').className = baseClass('-left-0.5', gameState.runners[2]);
+      updateStaminaUI();
+    }
+
+    // 지금 던지는 투수의 체력 막대 (내가 수비면 내 투수, 공격이면 상대 투수)
+    function updateStaminaUI() {
+      const st = currentStamina();
+      const bar = $('staminaBar');
+      bar.style.width = `${st}%`;
+      bar.className = `h-full transition-all ${st > 60 ? 'bg-emerald-500' : st > 30 ? 'bg-yellow-400' : 'bg-red-500'}`;
+      $('staminaText').textContent = `${Math.round(st)} / 100`;
+      $('staminaLabel').textContent = isSpec() ? `${gameState.isTopInning ? NET.names.home : NET.names.away} 투수` : aiIsPitching() ? '상대 투수 체력' : '내 투수 체력';
+    }
+
+    // 타석이 끝나면 카운트를 지우고, 다음 투구 때 투구 위치 기록도 새로 시작합니다.
+    function resetCount() { gameState.balls = 0; gameState.strikes = 0; gameState.newBatter = true; }
+
+    function scoreRuns(runs) {
+      if (runs <= 0) return;
+      if (gameState.isTopInning) gameState.scoreAway += runs;
+      else gameState.scoreHome += runs;
+      sound.playCheer();
+      showAlert(`🔥 ${runs}득점!!`, 2400);
+    }
+
+    // 볼넷: 밀려나는 주자만 한 베이스씩 진루합니다.
+    function walk() {
+      const r = gameState.runners;
+      let runs = 0;
+      if (r[0]) {
+        if (r[1]) {
+          if (r[2]) runs++;
+          r[2] = true;
+        }
+        r[1] = true;
+      }
+      r[0] = true;
+      scoreRuns(runs);
+    }
+
+    function addOut(label) {
+      gameState.outs++;
+      resetCount();
+      sound.playBeep(false);
+      umpireCall('스트라이크 아웃!');
+      showAlert(gameState.outs >= 3 ? `${label} 쓰리 아웃! 체인지!` : `${label} (${gameState.outs}아웃)`, 2000);
+    }
+
+    function addBall() {
+      gameState.balls++;
+      if (gameState.balls >= 4) {
+        showAlert('⚾ 볼넷! 1루 출루!', 2000);
+        resetCount();
+        walk();
+      } else {
+        showAlert(`볼! (${gameState.balls}B - ${gameState.strikes}S)`);
+      }
+    }
+
+    function addStrike(callName) {
+      gameState.strikes++;
+      if (gameState.strikes >= 3) {
+        addOut('⚡ 삼진 아웃!');
+      } else {
+        sound.playBeep(false);
+        showAlert(`${callName}! (${gameState.balls}B - ${gameState.strikes}S)`);
+      }
+    }
+
+    // 모든 투구 결과는 여기로 모입니다. 잠시 뒤 3아웃이면 공수 교대, 아니면 다음 투구로 넘어갑니다.
+    function finishPitchCycle() {
+      gameState.phase = 'RESOLVED';
+      updateScoreboard();
+      updateInstruction();
+      later(() => {
+        if (gameState.isGameOver) return;
+        // 마지막 이닝 말에 홈팀(나)이 앞서면 끝내기
+        if (!gameState.isTopInning && gameState.inning >= TOTAL_INNINGS && gameState.scoreHome > gameState.scoreAway) {
+          concludeGame(); return;
+        }
+        if (gameState.outs >= 3) switchInning();
+        else startNextPitch();
+      }, 1300);
+    }
+
+    function switchInning() {
+      gameState.outs = 0;
+      resetCount();
+      gameState.runners = [false, false, false];
+      if (gameState.isTopInning) {
+        // 마지막 이닝 초가 끝났는데 홈팀(나)이 이기고 있으면 말 공격 없이 종료
+        if (gameState.inning >= TOTAL_INNINGS && gameState.scoreHome > gameState.scoreAway) { concludeGame(); return; }
+        gameState.isTopInning = false;
+      } else {
+        if (gameState.inning >= TOTAL_INNINGS) { concludeGame(); return; }
+        gameState.inning++;
+        gameState.isTopInning = true;
+      }
+      // 방금까지 던진 투수는 한 이닝 쉬면서 체력을 조금 회복합니다.
+      const rested = staminaKey();
+      gameState.stamina[rested] = Math.min(100, gameState.stamina[rested] + 8);
+      // 나는 홈팀: 초에는 수비(투수), 말에는 공격(타자)
+      gameState.myPlayerRole = gameState.isTopInning ? 'PITCHER' : 'BATTER';
+      setSwingMode('CONTACT');
+      showChangeOverlay('공수 교대', '쓰리 아웃! 체인지');
+      sound.playCheer();
+      later(startNextPitch, 2800);
+    }
+
+    // 화면 전체를 덮는 공수 교대 연출 (render에서 그립니다)
+    function showChangeOverlay(title, sub) {
+      gameState.phase = 'CHANGE';
+      gameState.change = { t: 0, dur: 2.7, title, sub };
+      gameState.pitch.active = false;
+      gameState.hitBall.active = false;
+      updateScoreboard();
+      updateInstruction();
+    }
+
+    function startNextPitch() {
+      const p = gameState.pitch;
+      play = null;
+      gameState.change = null;
+      gameState.phase = 'SET_TARGET';
+      if (gameState.newBatter) {
+        gameState.pitchLog = []; gameState.lastCatch = null; gameState.lastTrail = null; gameState.newBatter = false;
+        // AI 타자는 타석마다 바뀝니다 (1대1은 상대가 고른 손)
+        gameState.aiBatterHand = versus() ? NET.awayHands.bat : Math.random() < 0.35 ? 'L' : 'R';
+      }
+      p.active = false; p.swung = false; p.meterActive = false; p.meterVal = 0;
+      gameState.batter.holdFollow = false;
+      gameState.batter.isSwinging = false;
+      pitchMeterBar.style.width = '0%';
+      meterMarker.style.left = '0%';
+      pitcherQualityText.textContent = '대기 중';
+      pitcherQualityText.className = 'text-yellow-300';
+      selectPitchType(p.type, true);
+      gameState.steal = null;
+      updateScoreboard();
+      updateInstruction();
+      if (versus()) return; // 1대1: 상대 입력을 기다립니다
+      if (aiIsPitching()) runAIPitchSequence();
+      else maybeAISteal();
+    }
+
+    // ================== 도루 ==================
+    // 주자는 투수가 투구 동작을 시작할 때 리드(STEAL_LEAD)에서 출발합니다.
+    // 공이 미트에 들어가면: 주자 도착 시간 vs (투구 동작 + 공 비행 + 포수 송구) 로 세이프/아웃.
+    const STEAL_LEAD = 12, STEAL_SPEED = 27;           // 리드 폭(ft), 도루 주자 전력질주 속도(ft/s)
+    const POP_TIME = { 2: 1.95, 3: 1.7 };              // 포수가 받아서 2루/3루에 태그까지 (초)
+
+    // 도루할 수 있는 주자(현재 베이스): 다음 베이스가 비었거나 앞 주자도 같이 뛰면 가능. 3루 주자는 홈스틸 안 함.
+    function stealCandidates() {
+      const r = gameState.runners, out = [];
+      if (r[1] && !r[2]) out.push(2);
+      if (r[0] && (!r[1] || out.includes(2))) out.push(1);
+      return out;
+    }
+
+    function startSteal(bases, byAI) {
+      gameState.steal = { bases, byAI, speeds: bases.map(() => STEAL_SPEED + gauss() * 1.5) };
+      // 도루는 수비 측에 숨깁니다: 호스트 자신의 도루만 호스트 화면에 알림 (상대의 도루는 상대 화면에서 알림)
+      if (!byAI && !NET.acting) {
+        sound.playBeep(true);
+        showAlert(`🏃 도루 시도! ${bases.map(k => `${k}루→${k + 1}루`).join(', ')}`, 1500, true);
+      }
+    }
+
+    function userSteal() {
+      const p = gameState.pitch;
+      if (myRole() !== 'BATTER') return;
+      if (gameState.phase === 'FIELD') return isGuest() ? netInput({ a: 'steal' }) : userExtraBase(); // 타구가 나간 뒤 S = 추가 진루
+      if (gameState.steal) return;
+      if (isGuest()) { showAlert('🏃 도루 시도!', 1500); return netInput({ a: 'steal' }); }
+      const ok = ['SET_TARGET', 'METER_RUNNING'].includes(gameState.phase) || (gameState.phase === 'PITCH_FLYING' && !p.released);
+      if (!ok) return;
+      const bases = stealCandidates();
+      if (!bases.length) { setFeedback('도루할 수 있는 주자가 없어요', '#94a3b8'); return; }
+      startSteal(bases, false);
+    }
+
+    // 추가 진루 (타구가 나간 뒤 S): 모든 주자가 한 베이스 더 노립니다. 달리는 주자는 도착하자마자 계속,
+    // 서 있는 주자는 바로 출발 (앞 주자가 막고 있으면 비는 순간 출발). 무리하면 태그 아웃!
+    const EXTRA_SPRINT = 1.3;
+    function userExtraBase() {
+      const P = play;
+      if (!P || P.over || P.hr || P.finished) return;
+      const go = P.runners.filter(r => (r.state === 'RUN' || r.state === 'SAFE') && !r.extra && r.base < 4);
+      if (!go.length) return;
+      // 추가 진루를 건 주자는 전력질주 (EXTRA_SPRINT배 속도)
+      go.forEach(r => { r.extra = true; r.speed *= EXTRA_SPRINT; addPopup('GO!', pathPos(r.s), '#fbbf24'); });
+      sound.playBeep(true);
+      showAlert('🏃 추가 진루!', 1200);
+    }
+
+    // 투구 동작 시작부터 지금까지 흐른 시간(초)과 그동안 주자가 뛴 거리(ft)
+    function stealElapsed() {
+      const p = gameState.pitch;
+      if (!p.active && p.progress <= 0) return 0;
+      return p.released ? DELIVERY + Math.min(p.progress, CATCH_PROGRESS) * flightSeconds(p.kmh) : p.deliveryT;
+    }
+    const stealDistance = (i, t) => Math.min(90, STEAL_LEAD + gameState.steal.speeds[i] * t);
+
+    // 공이 포수 미트에 들어간 뒤 도루 판정. 포수는 앞선 주자에게 던집니다(더블 스틸이면 뒤 주자는 세이프).
+    function resolveSteal() {
+      const st = gameState.steal, p = gameState.pitch;
+      gameState.steal = null;
+      const lead = Math.max(...st.bases), i = st.bases.indexOf(lead);
+      const runnerT = (90 - STEAL_LEAD) / st.speeds[i];
+      const throwT = DELIVERY + flightSeconds(p.kmh) + POP_TIME[lead + 1] + gauss() * 0.12;
+      const safe = throwT > runnerT;
+      const r = gameState.runners;
+      st.bases.slice().sort((a, b) => b - a).forEach(k => {
+        r[k - 1] = false;
+        if (k !== lead || safe) r[k] = true;
+      });
+      sound.playCatch();
+      if (safe) {
+        showAlert(`🏃 도루 성공! ${lead + 1}루 세이프${st.bases.length > 1 ? ' (더블 스틸)' : ''}`, 2000);
+      } else {
+        gameState.outs++;
+        sound.playBeep(false);
+        umpireCall('태그 아웃!');
+        showAlert(`💥 도루 저지! ${lead + 1}루에서 태그 아웃${gameState.outs >= 3 ? ' 쓰리 아웃! 체인지!' : ` (${gameState.outs}아웃)`}`, 2200);
+      }
+    }
+
+    // AI 공격: 투구 전에 몰래 도루를 겁니다 (공이 손을 떠나야 보입니다).
+    function maybeAISteal() {
+      if (!aiIsBatting() || gameState.outs >= 2) return;
+      const bases = stealCandidates();
+      if (!bases.length) return;
+      if (Math.random() < (bases.includes(1) ? 0.12 : 0.05)) startSteal(bases, true);
+    }
+
+    function concludeGame() {
+      gameState.isGameOver = true;
+      gameState.phase = 'GAME_OVER';
+      updateScoreboard();
+      updateInstruction();
+      sound.playCheer();
+      showResult();
+    }
+
+    // 결과 화면: 내 편(원정이면 원정 점수) 기준으로 승패, 관전자는 이긴 사람 이름
+    function showResult() {
+      const { scoreAway: a, scoreHome: h } = gameState, n = NET.names;
+      if (isSpec()) $('modalResultTitle').textContent = h > a ? `🏆 ${n.home} 승리!` : a > h ? `🏆 ${n.away} 승리!` : '🤝 무승부';
+      else {
+        const [me, opp] = isGuest() ? [a, h] : [h, a];
+        $('modalResultTitle').textContent = me > opp ? '🏆 승리!' : me < opp ? '😭 패배...' : '🤝 무승부';
+      }
+      $('modalResultDesc').textContent = `최종 스코어  ${n.away} ${a} : ${h} ${n.home}`;
+      $('restartBtn').textContent = versus() ? '로비로 돌아가기 ⚾' : '새 경기 시작하기 ⚾';
+      $('gameOverModal').classList.remove('hidden');
+    }
+
+    function resetGame() {
+      gameState.token++;
+      Object.assign(gameState, {
+        inning: 1, isTopInning: true, scoreAway: 0, scoreHome: 0,
+        outs: 0, runners: [false, false, false], isGameOver: false, myPlayerRole: 'PITCHER',
+        pitchLog: [], lastCatch: null, speedGun: null, ump: null,
+        aiPitcherHand: versus() ? NET.awayHands.throw : Math.random() < 0.3 ? 'L' : 'R',
+        stamina: { me: 100, ai: 100 }
+      });
+      gameState.ai.willSwing = false;
+      play = null;
+      resetCount();
+      gameState.hitBall.active = false;
+      gameState.batter.isSwinging = false;
+      $('gameOverModal').classList.add('hidden');
+      setSwingMode('CONTACT');
+      setBatterQuad(0, 1);
+      selectPitchType('FASTBALL', true);
+      showChangeOverlay('플레이 볼!', '3이닝 경기 시작');
+      later(startNextPitch, 2400);
+    }
+
+    // 경기 전 선수 설정 화면: 진행 중이던 타이머는 모두 무시하고 설정을 받습니다.
+    function openSetup() {
+      gameState.token++;
+      play = null;
+      gameState.isGameOver = false;
+      gameState.phase = 'SETUP';
+      gameState.change = null;
+      gameState.pitch.active = false;
+      $('gameOverModal').classList.add('hidden');
+      $('setupModal').classList.remove('hidden');
+      refreshHandButtons();
+      updateInstruction();
+    }
+
+    function refreshHandButtons() {
+      document.querySelectorAll('.hand-btn').forEach(btn => {
+        const on = btn.dataset.throw ? myHands.throw === btn.dataset.throw : myHands.bat === btn.dataset.bat;
+        const color = btn.dataset.throw ? 'bg-sky-600 border-sky-300 text-white' : 'bg-amber-500 border-amber-300 text-slate-950';
+        btn.className = `hand-btn text-sm py-2 rounded-lg font-bold border-2 transition-all ${on ? color + ' scale-105' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'}`;
+      });
+    }
+
+    function startFromSetup() {
+      try { localStorage.setItem('magumagu-hands', JSON.stringify(myHands)); } catch (e) {}
+      $('setupModal').classList.add('hidden');
+      resetGame();
+    }
+
+    function selectPitchType(type, byAI = false) {
+      if (!byAI && (myRole() !== 'PITCHER' || gameState.phase !== 'SET_TARGET')) return;
+      gameState.pitch.type = type;
+      pitchBtnList.forEach(btn => {
+        const active = btn.dataset.pitch === type;
+        btn.className = `pitch-btn text-xs py-1.5 rounded font-bold transition-all border ${active ? 'bg-sky-600 border-sky-300 text-white' : 'bg-slate-800 hover:bg-slate-700 border-slate-600 text-slate-200'}`;
+      });
+      // 내가 타자일 때는 AI가 뭘 던질지 미리 보여주지 않습니다. (공이 도착하면 공개)
+      selectedPitchBadge.textContent = aiIsPitching() ? '상대 구종: ???' : `선택 구종: ${PITCHES[type].name}`;
+      if (!byAI) sound.playBeep(true);
+    }
+
+    function startPitchMeter() {
+      if (gameState.isGameOver || gameState.phase !== 'SET_TARGET' || myRole() !== 'PITCHER') return;
+      const p = gameState.pitch;
+      gameState.phase = 'METER_RUNNING';
+      gameState.meterT = 0;
+      p.meterVal = 0; p.meterDir = 1; p.meterActive = true;
+      sound.playBeep(true);
+      updateInstruction();
+      // 1대1 원정 투수: 게이지는 내 화면에서 돌리고, 호스트에게는 투구 동작만 시작하라고 알립니다.
+      if (isGuest()) { NET.meter = 'running'; netInput({ a: 'meterStart', type: p.type, aimX: p.aimX, aimY: p.aimY }); }
+    }
+
+    function showQuality(quality, kmh, cost) {
+      const view = {
+        SHARP: ['🎯 제구 좋음', 'text-emerald-400 font-bold'],
+        MISTAKE: ['⚠️ 실투! 공이 가운데로 몰립니다', 'text-red-400 font-bold'],
+        NORMAL: ['보통 투구', 'text-sky-300 font-bold'],
+      }[quality];
+      pitcherQualityText.textContent = `${view[0]} · ${kmh}km/h · 체력 -${cost.toFixed(1)}`;
+      pitcherQualityText.className = view[1];
+    }
+
+    function releasePitchMeter() {
+      const p = gameState.pitch;
+      if (!p.meterActive || gameState.phase !== 'METER_RUNNING' || myRole() !== 'PITCHER') return;
+      p.meterActive = false;
+      if (isGuest()) {
+        if (NET.meter !== 'running') return;
+        NET.meter = 'sent';
+        return netInput({ a: 'pitch', type: p.type, aimX: p.aimX, aimY: p.aimY, meter: p.meterVal });
+      }
+      launchPitch();
+    }
+
+    // 게이지(p.meterVal)로 구속을, 투수 체력으로 제구·변화·실투 여부를 정해 공을 던집니다.
+    function launchPitch() {
+      const p = gameState.pitch;
+      const spec = PITCHES[p.type];
+      const key = staminaKey(), st = gameState.stamina[key];
+      const quality = Math.random() < mistakeChance(st, p.meterVal) ? 'MISTAKE' : st >= 65 ? 'SHARP' : 'NORMAL';
+      const cost = staminaCost(p.meterVal);
+      gameState.stamina[key] = Math.max(0, st - cost);
+      gameState.phase = 'PITCH_FLYING';
+      p.quality = quality;
+
+      // 제구: 체력이 좋을수록 노린 곳에 정확히. 실투는 노린 곳에서 가운데 쪽으로 30~60% 틀어져 들어가고,
+      // 지친 투수일수록 더 한가운데로 몰립니다 (체력 0이면 최대 90%).
+      if (quality === 'MISTAKE') {
+        const pull = 0.3 + Math.random() * 0.3 + 0.3 * (1 - st / 100);
+        p.targetX = p.aimX + (ZONE_CENTER.x - p.aimX) * pull + gauss() * 8;
+        p.targetY = p.aimY + (ZONE_CENTER.y - p.aimY) * pull + gauss() * 8;
+      } else {
+        const err = 3 + 9 * (1 - st / 100);
+        p.targetX = p.aimX + gauss() * err;
+        p.targetY = p.aimY + gauss() * err;
+      }
+      p.inZone = isInZone(p.targetX, p.targetY);
+      p.kmh = kmhFromMeter(p.type, p.meterVal, st);
+      p.speed = 1 / (flightSeconds(p.kmh) * 60); // 한 프레임에 나아가는 비율
+      p.speedShown = false;
+      showQuality(quality, p.kmh, cost);
+      updateStaminaUI();
+      gameState.speedGun = null;
+      gameState.lastCatch = null;
+      // 변화량: 체력이 좋을수록 날카롭게(niceBreak 쪽), 실투는 절반만 꺾이는 밋밋한 공.
+      // 좌투수는 공이 반대 방향으로 꺾이고, 공을 놓는 위치도 반대쪽입니다 (포수 시점: 우투수의 오른팔은 화면 왼쪽).
+      const handSign = pitcherHand() === 'L' ? -1 : 1;
+      const sharp = quality === 'MISTAKE' ? 0 : st / 100;
+      const hang = quality === 'MISTAKE' ? 0.5 : 1;
+      const bx = spec.breakX + ((spec.niceBreakX ?? spec.breakX) - spec.breakX) * sharp;
+      const by = spec.breakY + ((spec.niceBreakY ?? spec.breakY) - spec.breakY) * sharp;
+      p.breakX = handSign * bx * hang;
+      p.breakY = by * hang;
+      p.pow = spec.pow;
+      // 공은 투수가 팔을 휘둘러 놓는 순간(DELIVERY초 뒤) 손에서 출발합니다. 그 전까지는 투구 동작만 보입니다.
+      const rel = pitcherHandPoint(POSE_P.RELEASE);
+      p.startX = rel[0]; p.startY = rel[1];
+      p.ballX = p.startX; p.ballY = p.startY;
+      p.progress = 0; p.swung = false; p.active = true;
+      p.released = false; p.deliveryT = 0;
+      p.id = (p.id || 0) + 1;              // 1대1: 다른 화면이 새 투구를 알아보는 번호
+      p.remoteDone = false; p.waitT = 0;   // 1대1: 상대 타자의 스윙/지켜보기 응답
+      p.trail = [];
+      p.trail.color = spec.color;
+      gameState.lastTrail = p.trail;
+
+      if (aiIsBatting() && !versus()) planAISwing();
+      updateInstruction();
+    }
+
+    // 공이 홈플레이트에 도착하면 전광판에 구속을 띄우고, 상대 구종도 공개합니다.
+    function revealSpeed() {
+      const p = gameState.pitch;
+      if (p.speedShown) return;
+      p.speedShown = true;
+      gameState.speedGun = { kmh: p.kmh, name: PITCHES[p.type].name, t: 0 };
+      if (aiIsPitching()) selectedPitchBadge.textContent = `상대 구종: ${PITCHES[p.type].name} (${p.kmh}km/h)`;
+    }
+
+    function logPitch(x, y, call, color) {
+      gameState.pitchLog.push({ x, y, call, color, n: gameState.pitchLog.length + 1 });
+    }
+
+    function pitchPosition(p, progress) {
+      const t = Math.min(progress, 1);
+      const bend = Math.pow(t, p.pow);
+      return {
+        x: p.startX + (p.targetX - p.breakX - p.startX) * t + p.breakX * bend,
+        y: p.startY + (p.targetY - p.breakY - p.startY) * t + p.breakY * bend,
+      };
+    }
+
+    // AI 타자: 투구가 출발할 때 칠지 말지, 어디를 노릴지, 언제 휘두를지 정합니다.
+    function planAISwing() {
+      const p = gameState.pitch;
+      const b = gameState.batter;
+      // 1루에 주자가 있고 2아웃 전이면 가끔 보내기 번트를 댑니다 (2스트라이크에서는 안 함).
+      const bunt = gameState.runners[0] && !gameState.runners[2] && gameState.outs < 2 && gameState.strikes < 2 && Math.random() < 0.2;
+      let swingChance = p.quality === 'MISTAKE' ? 0.95 : p.inZone ? 0.72 : 0.28;
+      if (gameState.strikes === 2 && p.inZone) swingChance = 0.9;
+      if (bunt) swingChance = p.inZone ? 0.9 : 0.15;
+      gameState.ai.willSwing = Math.random() < swingChance;
+
+      // 칸 예측: 공이 들어올 칸을 맞힐 확률 (실투일수록 잘 읽음, 9칸인 강공은 더 어려움). 틀리면 이웃 칸 중 하나.
+      const mode = bunt ? 'BUNT' : Math.random() < 0.3 ? 'POWER' : 'CONTACT';
+      const guessRight = bunt ? 1 : (mode === 'POWER' ? { SHARP: 0.45, NORMAL: 0.55, MISTAKE: 0.8 } : { SHARP: 0.55, NORMAL: 0.65, MISTAKE: 0.85 })[p.quality];
+      const timingErr = bunt ? 0.05 : { SHARP: 0.078, NORMAL: 0.068, MISTAKE: 0.04 }[p.quality];
+      setSwingMode(mode);
+      const q = quadOf(p.targetX, p.targetY), n = gridN(mode);
+      if (Math.random() < guessRight) setBatterQuad(q.c, q.r);
+      else {
+        const others = [];
+        for (let c = 0; c < n; c++) for (let r = 0; r < n; r++) {
+          if ((c !== q.c || r !== q.r) && Math.abs(c - q.c) <= 1 && Math.abs(r - q.r) <= 1) others.push([c, r]);
+        }
+        setBatterQuad(...others[Math.floor(Math.random() * others.length)]);
+      }
+      gameState.ai.swingAt = IDEAL_HIT_PROGRESS + gauss() * timingErr;
+    }
+
+    // AI 투수: 구종·코스·제구를 정하고 게이지 연출 후 던집니다.
+    function runAIPitchSequence() {
+      later(() => {
+        if (gameState.phase !== 'SET_TARGET' || !aiIsPitching()) return;
+        // 구종 비중: 직구가 가장 많고 나머지는 골고루
+        const weights = { FASTBALL: 3, SLIDER: 1.5, CURVE: 1, FORK: 1, CHANGEUP: 1.2, CUTTER: 1.2, SINKER: 1.5 };
+        let roll = Math.random() * Object.values(weights).reduce((a, w) => a + w, 0), pick = 'FASTBALL';
+        for (const [t, w] of Object.entries(weights)) { if ((roll -= w) < 0) { pick = t; break; } }
+        selectPitchType(pick, true);
+        const p = gameState.pitch;
+        if (Math.random() < 0.7) {
+          p.aimX = ZONE.x + 15 + Math.random() * (ZONE.w - 30);
+          p.aimY = ZONE.y + 15 + Math.random() * (ZONE.h - 30);
+        } else {
+          // 유인구: 존 바깥 테두리
+          p.aimX = ZONE.x - 30 + Math.random() * (ZONE.w + 60);
+          p.aimY = Math.random() < 0.5 ? ZONE.y - 25 + Math.random() * 20 : ZONE.y + ZONE.h + 5 + Math.random() * 20;
+        }
+        gameState.phase = 'METER_RUNNING';
+        gameState.meterT = 0;
+        p.meterVal = 0; p.meterDir = 1; p.meterActive = true;
+        updateInstruction();
+
+        // 구속은 게이지로: 대체로 60~95%, 가끔 힘을 빼서 완급 조절
+        const meterStop = Math.random() < 0.2 ? 30 + Math.random() * 30 : 60 + Math.random() * 35;
+        later(() => {
+          p.meterActive = false;
+          p.meterVal = meterStop;
+          pitchMeterBar.style.width = `${meterStop}%`;
+          meterMarker.style.left = `${meterStop}%`;
+          launchPitch();
+        }, 500 + Math.random() * 500);
+      }, 900);
+    }
+
+    // 타격 모드: 고른 칸 + margin(칸 밖으로 인정해 주는 여유, px) 안에 공이 오면 맞습니다.
+    // CONTACT(4칸) / POWER(9칸: 칸이 작고 타이밍도 빡빡하지만 장타) / BUNT(가장 넓고 타이밍 여유, 약하게 굴림)
+    const SWING_MODES = {
+      CONTACT: { radius: 28, margin: 0, window: 0.1, badge: '타격 모드: 컨택트 스윙 (2×2칸)', btn: '타격모드: 컨택트 [X]' },
+      POWER: { radius: 18, margin: 5, window: 0.075, badge: '타격 모드: 강공 풀스윙 (1칸)', btn: '타격모드: 강공 [X]' },
+      BUNT: { radius: 35, margin: 30, window: 0.14, badge: '타격 모드: 🙇 번트', btn: '타격모드: 번트 (X=해제)' },
+    };
+    const IN_CELL_WINDOW = 1.6, IN_CELL_ACCURACY = 0.15; // 노린 칸 적중 보너스 (타이밍 범위 배수, 정타 보정)
+    function setSwingMode(mode) {
+      const b = gameState.batter, m = SWING_MODES[mode];
+      b.mode = mode;
+      b.contactRadius = m.radius;
+      // 사각형 크기가 바뀌므로 지금 노리던 위치를 가장 잘 담는 곳으로 다시 맞춥니다.
+      const cell = cellOf(b.aimX, b.aimY, spanOf(mode));
+      setBatterQuad(cell.c, cell.r);
+      swingModeDom(mode);
+    }
+    function swingModeDom(mode) {
+      const m = SWING_MODES[mode];
+      batSwingModeBadge.textContent = m.badge;
+      swingModeBtn.textContent = m.btn;
+      $('buntBtn').textContent = mode === 'BUNT' ? '🏏 강공 전환 [B]' : '🙇 번트 자세 [B]';
+    }
+    // 1대1 원정 타자: 노리는 칸·모드는 내 화면이 주인이고, 바뀔 때마다 호스트에 알립니다.
+    function sendBatter() {
+      const b = gameState.batter;
+      if (isGuest() && gameState.myPlayerRole === 'BATTER') netInput({ a: 'batter', mode: b.mode, c: b.quad.c, r: b.quad.r });
+    }
+
+    function toggleSwingMode() {
+      if (myRole() !== 'BATTER') return;
+      setSwingMode(gameState.batter.mode === 'CONTACT' ? 'POWER' : 'CONTACT');
+      sound.playBeep(true);
+      sendBatter();
+    }
+
+    function toggleBunt() {
+      if (myRole() !== 'BATTER' || gameState.pitch.swung) return;
+      setSwingMode(gameState.batter.mode === 'BUNT' ? 'CONTACT' : 'BUNT');
+      sound.playBeep(true);
+      sendBatter();
+    }
+
+    function executeSwing(byAI = false) {
+      if (gameState.isGameOver) return;
+      if (!byAI && myRole() !== 'BATTER') return;
+      if (['FIELD', 'BATTED', 'CHANGE', 'SETUP'].includes(gameState.phase)) return;
+      const b = gameState.batter;
+      const p = gameState.pitch;
+      if (b.isSwinging) return;
+      if (isGuest()) {
+        // 원정 타자: 스윙 동작은 바로 내 화면에, 판정은 "내 화면에서 공이 어디 있었는지"를 보내 호스트가 합니다.
+        const live = p.active && p.released && gameState.phase === 'PITCH_FLYING' && !p.swung && p.progress < CATCH_PROGRESS;
+        b.isSwinging = true; b.swingFrame = 0; b.swingFrom = b.load || 0; b.holdFollow = live;
+        if (live) p.swung = true;
+        return netInput({ a: 'swing', id: p.id, progress: live ? p.progress : null, mode: b.mode, c: b.quad.c, r: b.quad.r });
+      }
+      const pitchLive = p.active && gameState.phase === 'PITCH_FLYING';
+      if (pitchLive && p.swung) return; // 한 투구에 스윙은 한 번만
+      b.isSwinging = true;
+      b.swingFrame = 0;
+      b.swingFrom = b.load || 0;
+      b.holdFollow = pitchLive; // 실전 스윙은 다음 공까지 팔로스루 자세를 유지
+
+      if (!pitchLive) { sound.playSwingMiss(); return; }
+      p.swung = true;
+
+      const timingDiff = p.progress - IDEAL_HIT_PROGRESS;
+      const bunting = b.mode === 'BUNT';
+      let timingWindow = SWING_MODES[b.mode].window;
+      const dx = b.aimX - p.ballX;
+      const dy = b.aimY - p.ballY;
+      // 위치 판정: 번트는 칸 가운데에서의 거리, 일반 스윙은 고른 칸(+여유) 안에 공이 들어왔는지
+      let inReach, accuracy, dyRatio;
+      if (bunting) {
+        const maxHitDist = b.contactRadius + 14;
+        inReach = Math.hypot(dx, dy) <= maxHitDist;
+        accuracy = 1 - Math.hypot(dx, dy) / maxHitDist;
+        dyRatio = dy / maxHitDist;
+      } else {
+        const q = cellRect(b.quad.c, b.quad.r, spanOf(b.mode)), m = SWING_MODES[b.mode].margin;
+        const nx = -dx / (q.w / 2 + m), ny = -dy / (q.h / 2 + m); // 칸 가운데 기준 -1~1
+        inReach = Math.abs(nx) <= 1 && Math.abs(ny) <= 1;
+        accuracy = 1 - clamp(Math.hypot(nx, ny) / 1.7, 0, 1);     // 칸 가운데에 가까울수록 정타 (가장자리도 어느 정도 맞음)
+        dyRatio = -ny;                                              // 공이 칸 위쪽이면 공 밑을 때려 뜬공, 아래쪽이면 땅볼
+        // 노린 칸 안(여유 제외)으로 공이 들어오면: 사람 타자는 타이밍 허용 범위가 넓어지고 더 잘 맞습니다.
+        if (!byAI && Math.abs(dx) <= q.w / 2 && Math.abs(dy) <= q.h / 2) {
+          timingWindow *= IN_CELL_WINDOW;
+          accuracy = Math.min(1, accuracy + IN_CELL_ACCURACY);
+        }
+      }
+
+      if (Math.abs(timingDiff) <= timingWindow && inReach) {
+        p.active = false;
+        gameState.phase = 'BATTED';
+        revealSpeed();
+        let bb;
+        if (bunting) {
+          sound.playBuntTap();
+          setFeedback('번트!', '#fbbf24');
+          bb = buntBall(accuracy, timingDiff / timingWindow, dx / (b.contactRadius + 14), dyRatio);
+        } else {
+          const timingScore = 1 - Math.abs(timingDiff) / timingWindow;
+          sound.playBatCrack(clamp(accuracy * 0.6 + timingScore * 0.4, 0, 1));
+          gameState.shakeTimer = 8;
+          const timing = timingDiff < -0.025 ? 'EARLY' : timingDiff > 0.025 ? 'LATE' : 'PERFECT';
+          const label = { EARLY: 'EARLY (당겨치기)', LATE: 'LATE (밀어치기)', PERFECT: 'PERFECT' }[timing];
+          setFeedback(`${label}!`, '#22c55e');
+          bb = battedBall(accuracy, timingDiff, dyRatio, timingWindow);
+        }
+        logPitch(p.ballX, p.ballY, bb.foul ? '파울' : '타격', bb.foul ? '#fb923c' : '#c084fc');
+        launchHitBallVisual(bb);
+        // 도루 중에 쳤으면: 파울은 도루 취소(귀루), 인플레이는 뛰던 만큼 앞에서 달리는 히트앤드런
+        if (gameState.steal) {
+          if (bb.foul) gameState.steal = null;
+          else gameState.steal.elapsed = stealElapsed();
+        }
+        if (bb.foul) {
+          // 2스트라이크 이후 파울은 카운트가 늘지 않지만, 번트 파울은 삼진입니다.
+          const buntStrikeout = bunting && gameState.strikes === 2;
+          showAlert(buntStrikeout ? '⚠️ 번트 파울!' : '⚠️ 파울!', 1500);
+          later(() => {
+            gameState.hitBall.active = false;
+            if (buntStrikeout) addStrike('번트 파울');
+            else if (gameState.strikes < 2) gameState.strikes++;
+            finishPitchCycle();
+          }, 1200);
+        } else {
+          showAlert(bb.bunt ? '🙇 번트!' : bb.la > 25 ? '⚾ 높이 뜬 타구!' : bb.la < 8 ? '⚾ 땅볼 타구!' : '⚾ 라인드라이브!', 1000);
+          later(() => { gameState.hitBall.active = false; startFieldPlay(bb); }, 500);
+        }
+        updateInstruction();
+      } else {
+        // 헛스윙은 공이 미트에 들어갈 때 스트라이크로 판정됩니다.
+        sound.playSwingMiss();
+        setFeedback(!inReach ? (bunting ? '번트 빗나감' : '구역 빗나감') : Math.abs(timingDiff) > timingWindow && timingDiff < 0 ? '너무 빨라요' : '너무 늦어요', '#ef4444');
+      }
+    }
+
+    // 맞힌 순간의 정확도·타이밍·높이로 타구 속도(mph), 발사각, 방향을 정합니다.
+    // 노림수가 공보다 아래(dyRatio > 0)면 공 밑을 때려 뜨고, 위면 땅볼. 일찍 치면 좌측, 늦으면 우측.
+    function battedBall(accuracy, timingDiff, dyRatio, win) {
+      const isPower = gameState.batter.mode === 'POWER';
+      const timingScore = clamp(1 - Math.abs(timingDiff) / win, 0, 1);
+      const ev = clamp((isPower ? 86 + accuracy * 30 : 80 + accuracy * 22) * (0.8 + 0.2 * timingScore) + gauss() * 4, 45, 118);
+      const la = clamp(12 + dyRatio * 26 + (isPower ? 5 : 0) + gauss() * 9, -25, 75);
+      // 우타자는 당겨치면 좌측(-), 좌타자는 당겨치면 우측(+)
+      const spray = (batterHand() === 'L' ? -1 : 1) * (timingDiff / win) * 50 + gauss() * 10;
+      return { ev, la, spray, foul: Math.abs(spray) > 45 };
+    }
+
+    // 번트 타구: 정확히 댈수록 힘없이 죽는 공. 공 아래를 대면 뜨고(뜬공 위험), 배트 끝에 맞으면 옆으로 흐릅니다.
+    function buntBall(accuracy, timingRatio, dxRatio, dyRatio) {
+      const ev = clamp(22 + (1 - accuracy) * 12 + gauss() * 4, 12, 45);
+      const la = clamp(-10 + dyRatio * 40 + gauss() * 6, -30, 60);
+      const spray = -dxRatio * 40 + (batterHand() === 'L' ? -1 : 1) * timingRatio * 20 + gauss() * 8;
+      const foul = Math.abs(spray) > 45 || Math.random() < 0.15 * (1 - accuracy);
+      return { ev, la, spray, foul, bunt: true };
+    }
+
+    // 타격 직후 투구 화면에서 공이 튀어 나가는 짧은 연출
+    function launchHitBallVisual(bb) {
+      const hb = gameState.hitBall;
+      hb.active = true;
+      hb.x = gameState.pitch.ballX; hb.y = gameState.pitch.ballY; hb.altitude = 0;
+      hb.vx = bb.spray * 0.45;
+      hb.vy = -bb.ev / 7;
+      hb.vz = 3 + Math.max(0, bb.la) * 0.3;
+    }
+
+    // ================== 수비 장면 (필드 시점) ==================
+    let play = null;
+    const keysDown = new Set();
+
+    // 타구 궤적을 끝까지 미리 계산합니다 (60프레임 = 1초). 공기저항·바운드·굴러감·담장 반사 포함.
+    function simulateBatted(ev, la, spray) {
+      const v0 = ev * 1.4667, lr = la * Math.PI / 180, sr = spray * Math.PI / 180;
+      let x = 0, y = 2, z = 3;
+      let vx = v0 * Math.cos(lr) * Math.sin(sr), vy = v0 * Math.cos(lr) * Math.cos(sr), vz = v0 * Math.sin(lr);
+      const frames = [];
+      let firstBounce = -1, hrFrame = -1;
+      for (let i = 0; i < 60 * 14; i++) {
+        frames.push({ x, y, z });
+        if (hrFrame >= 0 && i - hrFrame > 50) break;
+        if (z > 0 || vz > 0) {
+          const v = Math.hypot(vx, vy, vz);
+          const lift = firstBounce < 0 ? LIFT * Math.max(0, Math.sin(lr)) * Math.hypot(vx, vy) : 0;
+          vx -= DRAG * v * vx * STEP; vy -= DRAG * v * vy * STEP; vz -= (G + DRAG * v * vz - lift) * STEP;
+          x += vx * STEP; y += vy * STEP; z += vz * STEP;
+          if (z <= 0) {
+            z = 0;
+            if (firstBounce < 0) firstBounce = i + 1;
+            if (vz < -6) { vz = -vz * 0.38; vx *= 0.8; vy *= 0.8; } else vz = 0;
+          }
+        } else {
+          const h = Math.hypot(vx, vy);
+          if (h < 1) break;
+          const k = Math.max(0, h - (Math.hypot(x, y) > 150 ? 22 : 14) * STEP) / h; // 잔디가 흙보다 잘 멈춥니다
+          vx *= k; vy *= k; x += vx * STEP; y += vy * STEP;
+        }
+        if (hrFrame < 0) {
+          const r = Math.hypot(x, y), ang = Math.atan2(x, y);
+          if (Math.abs(ang) < Math.PI / 4 + 0.05 && r >= fenceDist(ang)) {
+            if (z > FENCE_H && firstBounce < 0) hrFrame = i + 1;
+            else {
+              // 담장을 맞고 튕겨 나옵니다.
+              const ux = x / r, uy = y / r, vr = vx * ux + vy * uy;
+              if (vr > 0) { vx -= 1.4 * vr * ux; vy -= 1.4 * vr * uy; }
+              const f = fenceDist(ang) - 0.5;
+              x = ux * f; y = uy * f;
+            }
+          }
+        }
+      }
+      return { frames, firstBounce: firstBounce < 0 ? frames.length : firstBounce, hrFrame };
+    }
+
+    function startFieldPlay(bb) {
+      const sim = simulateBatted(bb.ev, bb.la, bb.spray);
+      const outsBefore = gameState.outs;
+      const isFly = sim.firstBounce > 66; // 1.1초 넘게 뜨면 뜬공: 2아웃 전이면 주자는 베이스에서 기다립니다
+      // 좌타자는 1루 쪽 타석이라 출발이 조금 빠릅니다.
+      const startDelay = batterHand() === 'L' ? 0.18 : 0.3;
+      const runners = [{ s: 0, base: 0, origin: 0, target: 1, state: 'RUN', forced: true, isBatter: true, delay: startDelay, speed: RUNNER_SPEED + gauss() * 1.2 }];
+      let chain = true;
+      for (let k = 1; k <= 3; k++) {
+        if (!gameState.runners[k - 1]) { chain = false; continue; }
+        const r = { s: k * 90, base: k, origin: k, target: k, state: 'SAFE', forced: chain, isBatter: false, delay: 0, speed: RUNNER_SPEED + gauss() * 1.2 };
+        if (outsBefore === 2) { r.target = k + 1; r.state = 'RUN'; }
+        else if (sim.hrFrame < 0 && isFly) r.state = 'WAIT';
+        else if (chain) { r.target = k + 1; r.state = 'RUN'; }
+        else if (k === 2 && bb.spray > 10) { r.target = 3; r.state = 'RUN'; } // 우측 땅볼이면 2루 주자는 3루로
+        // 바로 뛰는 주자는 리드를 잡고 있던 만큼 앞에서 출발합니다 (번트 때는 스타트를 더 빨리 끊음).
+        if (r.state === 'RUN') r.s += bb.bunt ? 16 : 10;
+        // 도루(히트앤드런) 중이던 주자는 이미 뛴 거리만큼 앞에서 계속 달립니다 (뜬공이 잡히면 귀루).
+        const st = gameState.steal;
+        if (st && st.bases.includes(k)) {
+          r.state = 'RUN'; r.target = k + 1;
+          r.s = k * 90 + stealDistance(st.bases.indexOf(k), st.elapsed || 0);
+        }
+        runners.push(r);
+      }
+      gameState.steal = null;
+      play = {
+        sim, t: 0, idx: 0, outsBefore, outs: 0, runs: 0, runners,
+        fielders: FIELDER_SPOTS.map(f => ({ ...f })),
+        ball: { state: 'FREE', x: 0, y: 2, z: 3, holder: -1, thrower: -1, from: null, to: 0, tt: 0, dur: 0, dist: 0 },
+        chaser: -1, interceptIdx: 0, cover: {}, rechase: 0,
+        touchedGround: false, caughtFly: false, awaitingThrow: false, decideTimer: 0, holderRunTo: -1,
+        over: false, endTimer: -1, finished: false, popups: [], hr: sim.hrFrame >= 0, hrAnnounced: false,
+        batterReached: false, manual: false, manualIdle: 0, la: bb.la, bunt: !!bb.bunt,
+        cam: { cx: 0, cy: 15, s: 3.4 }, flash: 1,
+        landing: sim.frames[Math.min(sim.firstBounce, sim.frames.length - 1)] // 뜬공 낙하 예상 지점 (다른 화면엔 sim 대신 이것만 보냄)
+      };
+      // 번트: 투수·포수·1루수·3루수가 바로 달려듭니다.
+      if (bb.bunt) [0, 1, 2, 5].forEach(i => { play.fielders[i].react = 0.15; play.fielders[i].speed += 2; });
+      gameState.phase = 'FIELD';
+      assignChaser();
+      updateInstruction();
+    }
+
+    function pathPos(s) {
+      const c = clamp(s, 0, 360);
+      const k = Math.min(3, Math.floor(c / 90));
+      const f = (c - k * 90) / 90;
+      const a = BASE_POS[k], b = BASE_POS[(k + 1) % 4];
+      return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+    }
+
+    function addPopup(text, pos, color) {
+      play.popups.push({ text, x: pos.x, y: pos.y, color, life: 1.4 });
+    }
+
+    // 수비수가 타구를 잡을 수 있는 가장 이른 프레임. 공이 멈추기 전에 못 잡으면 멈춘 공에 닿는 시점이라
+    // 마지막 프레임보다 클 수 있습니다 (좌표가 필요하면 interceptPoint 사용).
+    function interceptFrame(f) {
+      const fr = play.sim.frames;
+      const reactLeft = Math.max(0, f.react - play.t);
+      for (let i = play.idx; i < fr.length; i += 2) {
+        const b = fr[i];
+        if (b.z > CATCH_HEIGHT) continue;
+        const t = (i - play.idx) / 60;
+        if (Math.hypot(b.x - f.x, b.y - f.y) - reachFor(b.z) <= Math.max(0, t - reactLeft) * f.speed) return i;
+      }
+      const last = fr[fr.length - 1];
+      const t = reactLeft + Math.max(0, Math.hypot(last.x - f.x, last.y - f.y) - reachFor(0)) / f.speed;
+      return Math.max(fr.length - 1, play.idx + Math.ceil(t * 60));
+    }
+    const interceptPoint = () => play.sim.frames[Math.min(play.interceptIdx, play.sim.frames.length - 1)];
+
+    // 가장 먼저 공에 닿는 수비수가 쫓아가고, 나머지는 베이스 커버를 들어갑니다.
+    function assignChaser() {
+      let best = -1, bestI = Infinity, curI = Infinity;
+      play.fielders.forEach((f, i) => {
+        const fi = interceptFrame(f);
+        if (i === play.chaser) curI = fi;
+        if (fi < bestI) { best = i; bestI = fi; }
+      });
+      // 쫓던 수비수가 크게 늦는 게 아니면 바꾸지 않습니다 (조작이 튀지 않게).
+      if (play.chaser >= 0 && curI - bestI < 18) { play.interceptIdx = curI; return; }
+      play.interceptIdx = bestI;
+      if (best !== play.chaser) {
+        play.chaser = best;
+        play.manual = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].some(k => defenderKeys().has(k)) && humanDefending();
+        assignCoverage();
+      }
+    }
+
+    function assignCoverage() {
+      const c = play.chaser;
+      const side = interceptPoint().x; // +면 1루 쪽 타구
+      const cover = {};
+      const pick = (...cands) => cands.find(i => i !== c && !Object.values(cover).includes(i));
+      cover[1] = pick(2, 0, 3);
+      cover[2] = side < 0 ? pick(3, 4, 0) : pick(4, 3, 0);
+      cover[3] = pick(5, 4, 0, 6);
+      cover[4] = pick(1, 0);
+      play.cover = cover;
+    }
+
+    function coverBaseOf(i) {
+      for (const [b, f] of Object.entries(play.cover)) if (f === i) return Number(b);
+      return 0;
+    }
+
+    function moveToward(f, tx, ty, step) {
+      const dx = tx - f.x, dy = ty - f.y, d = Math.hypot(dx, dy);
+      if (d <= step) { f.x = tx; f.y = ty; return true; }
+      f.x += dx / d * step; f.y += dy / d * step;
+      return false;
+    }
+
+    const holderOnBase = B => play.ball.state === 'HELD' && dist2d(play.fielders[play.ball.holder], basePoint(B)) <= 4;
+    const aliveRunner = r => r.state !== 'OUT' && r.state !== 'SCORED';
+
+    // 공이 베이스 B에 도착하기까지 걸릴 것으로 보이는 시간 (주자가 추가 진루를 판단할 때 사용)
+    function defenseTimeTo(B) {
+      const bp = basePoint(B), b = play.ball;
+      if (b.state === 'HELD') {
+        const h = play.fielders[b.holder], d = dist2d(h, bp);
+        return d < 12 ? d / h.speed : THROW_RELEASE + d / THROW_SPEED;
+      }
+      if (b.state === 'THROWN') {
+        const to = basePoint(b.to);
+        return Math.max(0, b.dur - b.tt) + (b.to % 4 === B % 4 ? 0 : THROW_RELEASE + dist2d(to, bp) / THROW_SPEED);
+      }
+      // 굴러가는 공은 잡고 자세를 잡는 시간(0.5초)이 더 듭니다.
+      const ip = interceptPoint();
+      return Math.max(0, (play.interceptIdx - play.idx) / 60) + 0.5 + THROW_RELEASE + dist2d(ip, bp) / THROW_SPEED;
+    }
+
+    // 뒤 주자가 내 베이스로 오고 있으면 반드시 다음 베이스로 가야 합니다 (포스).
+    function mustAdvance(r) {
+      return play.runners.some(o => o !== r && o.state === 'RUN' && o.target === r.base && o.s < r.s);
+    }
+
+    // 앞 주자가 다음 베이스를 막고 있지 않은지
+    const laneClear = r => !play.runners.some(o => o !== r && aliveRunner(o) && o.s > r.s && o.target <= r.base + 1);
+
+    function canAdvance(r) {
+      if (play.ball.state === 'FREE' && !play.touchedGround) return false; // 공이 떠 있으면 무리하지 않음
+      const next = r.base + 1;
+      if (!laneClear(r)) return false;
+      // 베이스를 막 밟고 계속 뛰는 주자는 속도가 붙어 있고, 서 있던 주자는 출발이 늦습니다.
+      const runT = (next * 90 - r.s) / r.speed + (r.justArrived ? 0 : 0.3);
+      return runT - 0.4 < defenseTimeTo(next); // 조금 과감하게: 아슬아슬하면 뜁니다
+    }
+
+    function recordOut(r, kind) {
+      const P = play;
+      const pos = pathPos(r.s);
+      r.state = 'OUT';
+      P.outs++;
+      addPopup('OUT!', pos, '#ef4444');
+      sound.playBeep(false);
+      umpireCall({ FLY: '캐치! 아웃!', FORCE: '포스 아웃!', TAG: '태그 아웃!' }[kind] || '아웃!');
+      if (r.isBatter) P.runners.forEach(o => { o.forced = false; });
+      if (P.outsBefore + P.outs >= 3) {
+        // 타자가 1루에 닿기 전 아웃이나 포스 아웃으로 3아웃이 되면 이번 플레이의 득점은 인정되지 않습니다.
+        if (kind === 'FORCE' || kind === 'FLY' || (r.isBatter && !P.batterReached)) P.runs = 0;
+        P.over = true;
+        P.endTimer = 1.1;
+      }
+    }
+
+    // 공을 든 수비수가 베이스를 밟거나 주자를 태그하면 아웃
+    function checkTagAndForce() {
+      const P = play;
+      if (P.over || P.ball.state !== 'HELD') return;
+      const h = P.fielders[P.ball.holder];
+      for (const r of P.runners) {
+        if (P.over) return;
+        if (r.state === 'RUN' && r.forced && holderOnBase(r.target)) { recordOut(r, 'FORCE'); continue; }
+        if (r.state === 'RETURN' && holderOnBase(r.target)) { recordOut(r, 'TAG'); continue; }
+        if ((r.state === 'RUN' || r.state === 'RETURN') && r.delay <= 0) {
+          const off = r.s % 90;
+          if (off > 3 && off < 87 && dist2d(h, pathPos(r.s)) < TAG_DIST) recordOut(r, 'TAG');
+        }
+      }
+    }
+
+    function moveRunners(dt) {
+      const P = play;
+      const order = P.runners.filter(aliveRunner).sort((a, b) => b.s - a.s);
+      for (const r of order) {
+        if (P.over) return;
+        if (r.state === 'RUN' || r.state === 'RETURN') {
+          if (r.delay > 0) { r.delay -= dt; continue; }
+          const goal = r.target * 90, dir = goal >= r.s ? 1 : -1;
+          r.s += dir * r.speed * (P.hr ? 0.7 : 1) * dt;
+          if ((dir > 0 && r.s >= goal) || (dir < 0 && r.s <= goal)) {
+            r.s = goal; r.base = r.target;
+            if (r.isBatter) P.batterReached = true;
+            if (r.target >= 4) {
+              r.state = 'SCORED'; P.runs++;
+              addPopup('득점!', BASE_POS[0], '#facc15');
+              sound.playBeep(true);
+              continue;
+            }
+            if (holderOnBase(r.target)) { recordOut(r, 'TAG'); continue; }
+            if (!P.hr && P.ball.state === 'THROWN' && P.ball.to === r.target) addPopup('SAFE!', basePoint(r.target), '#4ade80');
+            r.state = 'SAFE';
+            r.justArrived = true;
+          }
+        }
+        if (r.state === 'SAFE' && !P.hr && (mustAdvance(r) || canAdvance(r) || (r.extra && laneClear(r)))) {
+          r.extra = false;
+          r.state = 'RUN';
+          r.target = r.base + 1;
+        }
+        r.justArrived = false;
+      }
+    }
+
+    function moveFielders(dt) {
+      const P = play;
+      P.fielders.forEach((f, i) => {
+        const step = f.speed * dt;
+        if (P.ball.state === 'HELD' && P.ball.holder === i) {
+          if (P.holderRunTo >= 0) {
+            const bp = basePoint(P.holderRunTo);
+            if (moveToward(f, bp.x, bp.y, step)) { P.holderRunTo = -1; startThrowDecision(true); }
+          }
+          return;
+        }
+        if (i === P.chaser && P.ball.state === 'FREE' && !P.hr) {
+          if (P.manual && humanDefending()) {
+            const keys = defenderKeys();
+            const mx = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
+            const my = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0);
+            const m = Math.hypot(mx, my);
+            if (m > 0) { f.x += mx / m * step; f.y += my / m * step; P.manualIdle = 0; return; }
+            // 방향키에서 손을 떼고 잠시 지나면 다시 자동 수비로 돌아갑니다.
+            if ((P.manualIdle += dt) < 0.8) return;
+            P.manual = false;
+          }
+          if (P.t < f.react) return; // 반응 시간
+          const ip = interceptPoint();
+          moveToward(f, ip.x, ip.y, step);
+          return;
+        }
+        if (P.t < 0.25) return;
+        const cb = coverBaseOf(i);
+        if (cb) { const bp = basePoint(cb); moveToward(f, bp.x, bp.y, step); }
+        else if (i >= 6 && P.ball.state === 'FREE' && !P.hr && P.t >= f.react) {
+          // 근처 외야수는 백업: 공 떨어질 곳 30ft 앞까지 따라갑니다 (빠지는 공은 백업이 잡기도 함).
+          const ip = interceptPoint(), d = dist2d(f, ip);
+          if (d < 160 && d > 30) moveToward(f, ip.x, ip.y, Math.min(step * 0.85, d - 30));
+        }
+        else if (P.hr && i >= 6) { const b = P.ball; moveToward(f, b.x, b.y, step * 0.6); }
+      });
+    }
+
+    function onBallLanded() {
+      play.touchedGround = true;
+      play.runners.forEach(r => {
+        if (r.state !== 'WAIT') return;
+        if (r.forced) { r.state = 'RUN'; r.target = r.base + 1; } else r.state = 'SAFE';
+      });
+    }
+
+    function onHomeRun() {
+      const P = play;
+      P.hrAnnounced = true;
+      P.ball.state = 'GONE';
+      gameState.shakeTimer = 12;
+      sound.playCheer();
+      const count = P.runners.filter(aliveRunner).length;
+      showAlert(count === 4 ? '💥 만루 홈런!!! 💥' : '🚀 홈런!! 담장을 넘어갑니다!!', 2600);
+      P.runners.forEach(r => { if (aliveRunner(r)) { r.state = 'RUN'; r.target = 4; r.delay = 0; } });
+    }
+
+    // 수비수 몸 근처(REACH)로 공이 오면 포구합니다. 땅에 닿기 전에 잡으면 뜬공 아웃.
+    function tryField() {
+      const P = play, b = P.ball;
+      if (b.z > CATCH_HEIGHT || P.t < 0.2) return;
+      let who = -1, bd = reachFor(b.z);
+      P.fielders.forEach((f, i) => {
+        const d = Math.hypot(f.x - b.x, f.y - b.y);
+        if (d <= bd) { who = i; bd = d; }
+      });
+      if (who < 0) return;
+      b.state = 'HELD'; b.holder = who;
+      sound.playCatch();
+      if (!P.touchedGround) {
+        P.caughtFly = true;
+        P.touchedGround = true;
+        addPopup('캐치!', b, '#38bdf8');
+        recordOut(P.runners[0], 'FLY');
+        // 공이 잡히면 모든 주자는 원래 베이스로 돌아가야 합니다 (귀루 전에 공이 가면 더블 아웃).
+        P.runners.forEach(r => {
+          if (r.isBatter || !aliveRunner(r)) return;
+          r.forced = false;
+          if (r.state === 'WAIT') { r.state = 'SAFE'; return; }
+          if (r.s > r.origin * 90 + 0.5) { r.state = 'RETURN'; r.target = r.origin; }
+          else { r.state = 'SAFE'; r.base = r.origin; r.target = r.origin; }
+        });
+      } else {
+        P.runners.forEach(r => { if (r.state === 'WAIT') r.state = 'SAFE'; });
+      }
+      if (!P.over) startThrowDecision(false);
+    }
+
+    function startThrowDecision(relay) {
+      const P = play;
+      P.awaitingThrow = true;
+      P.decideTimer = humanDefending() ? USER_THROW_WAIT : relay ? 0.15 + Math.random() * 0.3 : 0.35 + Math.random() * 0.35;
+    }
+
+    // AI 송구 판단: 잡을 수 있는 주자 중 가장 앞선 주자를 노립니다.
+    function chooseThrowBase() {
+      const P = play, h = P.fielders[P.ball.holder];
+      let bestB = -1, leadTarget = 0;
+      for (const r of P.runners) {
+        if (r.state !== 'RUN' && r.state !== 'RETURN') continue;
+        const B = r.target, d = dist2d(h, basePoint(B));
+        const tBall = d < 12 ? d / h.speed : THROW_RELEASE + d / THROW_SPEED;
+        const tRun = Math.abs(B * 90 - r.s) / r.speed + Math.max(0, r.delay);
+        // 선행 주자는 여유가 있을 때만 노립니다 (아슬아슬하면 확실한 타자 주자 쪽으로).
+        const need = r.isBatter ? 0 : r.forced || r.state === 'RETURN' ? 0.25 : 0.4;
+        if (tBall + need < tRun && B > bestB) bestB = B;
+        if (r.state === 'RUN') leadTarget = Math.max(leadTarget, B);
+      }
+      if (bestB >= 1) return bestB;
+      // 아웃이 어려우면 외야수는 앞선 주자의 다음 베이스로 던져 더 못 가게 막고, 내야수는 공을 들고 있습니다.
+      if (P.ball.holder >= 6 && leadTarget > 0) return Math.min(4, leadTarget + 1);
+      return null;
+    }
+
+    function throwTo(B) {
+      const P = play;
+      if (P.ball.state !== 'HELD' || P.over) return;
+      const h = P.fielders[P.ball.holder], bp = basePoint(B), d = dist2d(h, bp);
+      P.awaitingThrow = false;
+      if (d < 12) { P.holderRunTo = B; return; } // 가까우면 직접 밟으러 갑니다
+      Object.assign(P.ball, { state: 'THROWN', from: { x: h.x, y: h.y }, to: B, tt: -THROW_RELEASE, dur: d / THROW_SPEED, dist: d, thrower: P.ball.holder, holder: -1 });
+    }
+
+    function receiveThrow() {
+      const P = play, B = P.ball.to, bp = basePoint(B);
+      let rc = P.cover[B];
+      if (rc === undefined || rc === P.ball.thrower) {
+        let bd = Infinity;
+        P.fielders.forEach((f, i) => { const d = dist2d(f, bp); if (i !== P.ball.thrower && d < bd) { bd = d; rc = i; } });
+      }
+      const f = P.fielders[rc];
+      f.x = bp.x; f.y = bp.y;
+      P.ball.state = 'HELD'; P.ball.holder = rc;
+      sound.playCatch();
+      checkTagAndForce();
+      if (!P.over) startThrowDecision(true);
+    }
+
+    function userThrow(B) {
+      if (!play || gameState.phase !== 'FIELD' || myRole() !== 'PITCHER' || play.ball.state !== 'HELD' || play.over) return;
+      if (isGuest()) return netInput({ a: 'throw', B });
+      sound.playBeep(true);
+      throwTo(B);
+    }
+
+    function updateCamera() {
+      const P = play, b = P.ball;
+      const pts = [{ x: -25, y: -15 }, { x: 25, y: 135 }];
+      if (b.state !== 'GONE') pts.push({ x: b.x, y: b.y + b.z * 1.1 }, { x: b.x, y: b.y });
+      if (P.chaser >= 0 && b.state === 'FREE') pts.push(P.fielders[P.chaser]);
+      if (b.state === 'THROWN') pts.push(basePoint(b.to));
+      P.runners.filter(aliveRunner).forEach(r => pts.push(pathPos(r.s)));
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      pts.forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
+      const w = x1 - x0 + 90, h = y1 - y0 + 90;
+      const s = clamp(Math.min((CW - 40) / w, 480 / (h * TILT)), 0.95, 2.6);
+      const c = P.cam, k = 0.06;
+      c.cx += ((x0 + x1) / 2 - c.cx) * k;
+      c.cy += ((y0 + y1) / 2 - c.cy) * k;
+      c.s += (s - c.s) * k;
+    }
+
+    function updatePlay() {
+      const P = play, dt = STEP * PLAY_SPEED, b = P.ball, fr = P.sim.frames;
+      P.t += dt;
+      if (P.flash > 0) P.flash -= 0.05;
+
+      if (b.state === 'FREE') {
+        P.idx = Math.min(fr.length - 1, Math.floor(P.t * 60));
+        Object.assign(b, fr[P.idx]);
+        if (!P.touchedGround && P.idx >= P.sim.firstBounce) onBallLanded();
+        if (P.hr && P.idx >= P.sim.hrFrame && !P.hrAnnounced) onHomeRun();
+        if (!P.hr && (P.rechase -= dt) <= 0) { assignChaser(); P.rechase = 0.2; }
+      } else if (b.state === 'THROWN') {
+        b.tt += dt;
+        const k = clamp(b.tt / b.dur, 0, 1), to = basePoint(b.to);
+        b.x = b.from.x + (to.x - b.from.x) * k;
+        b.y = b.from.y + (to.y - b.from.y) * k;
+        b.z = 5 + Math.sin(Math.PI * k) * Math.min(22, b.dist * 0.06);
+        if (b.tt >= b.dur) receiveThrow();
+      }
+      if (b.state === 'HELD') { const h = P.fielders[b.holder]; b.x = h.x; b.y = h.y; b.z = 4; }
+
+      if (!P.over) {
+        moveFielders(dt);
+        if (b.state === 'FREE' && !P.hr) tryField();
+        checkTagAndForce();
+        moveRunners(dt);
+        checkTagAndForce();
+        if (b.state === 'HELD' && P.awaitingThrow && !P.over) {
+          if (!P.runners.some(r => r.state === 'RUN' || r.state === 'RETURN')) P.awaitingThrow = false;
+          else if ((P.decideTimer -= dt) <= 0) {
+            const B = chooseThrowBase();
+            P.awaitingThrow = false;
+            if (B !== null) throwTo(B);
+          }
+        }
+      }
+
+      P.popups.forEach(p => { p.life -= STEP; });
+      P.popups = P.popups.filter(p => p.life > 0);
+      updateCamera();
+
+      if (P.endTimer < 0) {
+        const live = P.runners.some(r => ['RUN', 'RETURN', 'WAIT'].includes(r.state));
+        const settled = P.hr ? P.hrAnnounced : b.state === 'HELD' && P.holderRunTo < 0;
+        if (!live && settled) P.endTimer = 0.7;
+      } else if ((P.endTimer -= dt) <= 0) finalizePlay();
+    }
+
+    function finalizePlay() {
+      const P = play;
+      P.finished = true;
+      gameState.outs = Math.min(3, P.outsBefore + P.outs);
+      const bases = [false, false, false];
+      P.runners.forEach(r => { if (r.state === 'SAFE' && r.base >= 1 && r.base <= 3) bases[r.base - 1] = true; });
+      gameState.runners = bases;
+      resetCount();
+
+      const batter = P.runners[0];
+      let label;
+      if (P.hr) label = P.runs === 4 ? '💥 만루 홈런!!!' : '🚀 홈런!!';
+      else if (P.outs >= 3) label = '🔥 삼중살!!!';
+      else if (P.outs === 2) label = '⚡ 병살! 더블 플레이!';
+      else if (P.bunt && batter.state === 'OUT' && P.caughtFly) label = '😣 번트가 떠서 잡혔습니다!';
+      else if (P.bunt && batter.state === 'OUT') {
+        const advanced = P.runs > 0 || P.runners.some(r => !r.isBatter && r.state === 'SAFE' && r.base > r.origin);
+        label = advanced ? '🙇 희생 번트 성공! 주자 진루' : '🧤 번트 실패, 타자 아웃';
+      }
+      else if (P.bunt && P.outs === 0) label = '🏃 번트 안타!';
+      else if (batter.state === 'OUT' && P.caughtFly && P.runs > 0) label = '🧤 희생 플라이!';
+      else if (batter.state === 'OUT' && P.caughtFly) label = P.la < 18 ? '🧤 라인드라이브 아웃!' : '🧤 뜬공 아웃!';
+      else if (batter.state === 'OUT') label = P.batterReached ? '🏃 추가 진루하다 태그 아웃!' : '🧤 땅볼 아웃!';
+      else if (P.outs === 1) label = '🧤 야수 선택! 앞선 주자 아웃';
+      else label = ['', '⚾ 안타!', '⚡ 2루타!', '🔥 3루타!'][batter.base] || '⚾ 안타!';
+      if (gameState.outs >= 3) label += ' 쓰리 아웃! 체인지!';
+
+      scoreRuns(P.runs);
+      if (P.outs > 0) sound.playBeep(false);
+      showAlert(P.runs > 0 ? `${label} 🔥 ${P.runs}득점!` : label, 2400);
+      finishPitchCycle();
+    }
+
+    // ================== 매 프레임 갱신 ==================
+    function meterTick(p) {
+      p.meterVal += p.meterSpeed * p.meterDir;
+      if (p.meterVal >= 100) { p.meterVal = 100; p.meterDir = -1; }
+      else if (p.meterVal <= 0) { p.meterVal = 0; p.meterDir = 1; }
+      pitchMeterBar.style.width = `${p.meterVal}%`;
+      meterMarker.style.left = `${p.meterVal}%`;
+      // 내가 던질 때는 지금 멈추면 나올 구속을 미리 보여줍니다.
+      if (gameState.myPlayerRole === 'PITCHER' && !isSpec()) {
+        const st = currentStamina(), risk = Math.round(mistakeChance(st, p.meterVal) * 100);
+        pitcherQualityText.textContent = `예상 ${kmhFromMeter(p.type, p.meterVal, st)}km/h · 체력 -${staminaCost(p.meterVal).toFixed(1)} · 실투 확률 ${risk}%`;
+        pitcherQualityText.className = risk >= 15 ? 'text-red-400 font-bold' : 'text-yellow-300 font-bold';
+      }
+    }
+
+    function updatePhysics() {
+      const p = gameState.pitch;
+      if (p.meterActive) meterTick(p);
+      gameState.meterT += STEP;
+      gameState.pitcherT += STEP;
+
+      if (p.active && gameState.phase === 'PITCH_FLYING' && !p.released) {
+        // 투구 동작 중: 공은 아직 손에 있습니다.
+        if ((p.deliveryT += STEP) >= DELIVERY) {
+          p.released = true; gameState.pitcherT = 0; p.trail.push({ x: p.ballX, y: p.ballY });
+          if (gameState.steal && versus()) showAlert('🏃 주자 도루 스타트!', 1200);
+          else if (gameState.steal && gameState.steal.byAI) showAlert('🏃 상대 주자 도루!', 1200);
+        }
+      } else if (p.active && gameState.phase === 'PITCH_FLYING') {
+        p.progress += p.speed;
+        const pos = pitchPosition(p, p.progress);
+        p.ballX = pos.x; p.ballY = pos.y;
+        p.trail.push({ x: pos.x, y: pos.y });
+        if (p.progress >= 1) revealSpeed();
+
+        if (aiIsBatting() && !versus() && gameState.ai.willSwing && !p.swung && p.progress >= gameState.ai.swingAt) {
+          executeSwing(true);
+        }
+
+        // 1대1에서 상대가 타자면: 상대 화면의 공은 조금 늦게 오므로, 스윙/지켜보기 응답이 올 때까지 미트 앞에서 기다립니다.
+        // (응답이 2초 넘게 없으면 지켜본 것으로 처리)
+        const waitRemote = p.active && isHost() && aiIsBatting() && !p.remoteDone && p.progress >= CATCH_PROGRESS && (p.waitT += STEP) < 2;
+        if (waitRemote) p.progress = CATCH_PROGRESS;
+        else if (p.active && p.progress >= CATCH_PROGRESS) {
+          // 포수 미트에 들어간 위치를 표시합니다.
+          p.active = false;
+          sound.playCatch();
+          gameState.lastCatch = { x: p.targetX, y: p.targetY };
+          gameState.catchAnim = 1;
+          const call = p.swung ? '헛스윙' : p.inZone ? '스트라이크' : '볼';
+          const color = p.swung ? '#f87171' : p.inZone ? '#facc15' : '#4ade80';
+          logPitch(p.targetX, p.targetY, call, color);
+          setFeedback(`${call} ${p.kmh}km/h`, color, p.targetX, p.targetY - 34);
+          if (p.swung) addStrike('헛스윙');
+          else if (p.inZone) addStrike('스트라이크');
+          else addBall();
+          // 도루 판정 (볼넷으로 밀려 가거나 삼진으로 이닝이 끝났으면 취소). 판정 문구가 먼저 보이도록 조금 늦게.
+          if (gameState.steal) {
+            const walked = call === '볼' && gameState.balls === 0;
+            if (walked || gameState.outs >= 3) gameState.steal = null;
+            else later(() => { resolveSteal(); updateScoreboard(); }, 650);
+          }
+          finishPitchCycle();
+        }
+      }
+
+      if (gameState.phase === 'FIELD' && play) updatePlay();
+      if (gameState.change) gameState.change.t += STEP;
+      if (gameState.speedGun) gameState.speedGun.t += STEP;
+      if (gameState.catchAnim > 0) gameState.catchAnim -= STEP * 1.5;
+
+      const hb = gameState.hitBall;
+      if (hb.active) {
+        hb.x += hb.vx * 0.32; hb.y += hb.vy * 0.45; hb.altitude += hb.vz * 0.32; hb.vz -= 0.38;
+        if (hb.altitude < 0) hb.altitude = 0;
+      }
+      const b = gameState.batter;
+      if (b.isSwinging && ++b.swingFrame > b.maxSwingFrames) b.isSwinging = false;
+      // 타자 준비 동작: 공이 날아오는 동안 체중을 뒤로 싣습니다.
+      const loadTarget = p.active && p.released && !p.swung ? clamp((p.progress - 0.3) / 0.4, 0, 1) : 0;
+      b.load = (b.load || 0) + (loadTarget - (b.load || 0)) * 0.25;
+      b.buntBlend = (b.buntBlend || 0) + ((b.mode === 'BUNT' ? 1 : 0) - (b.buntBlend || 0)) * 0.2;
+      if (gameState.feedback.alpha > 0) { gameState.feedback.alpha -= 0.02; gameState.feedback.y -= 0.4; }
+      if (gameState.shakeTimer > 0) gameState.shakeTimer--;
+      const u = gameState.ump;
+      if (u) {
+        const t0 = u.t;
+        u.t += STEP;
+        if (t0 < UMP_OUT_T && u.t >= UMP_OUT_T) sound.playUmpireExit(u.exit);
+        if (u.t >= UMP_DUR) gameState.ump = null;
+      }
+    }
+
+    // ================== 그리기 ==================
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    }
+
+    function drawPill(text, x, y, color, align = 'left') {
+      ctx.font = 'bold 15px "Do Hyeon", sans-serif';
+      const w = ctx.measureText(text).width + 22;
+      const left = align === 'center' ? x - w / 2 : align === 'right' ? x - w : x;
+      ctx.fillStyle = 'rgba(2,6,23,0.82)'; roundRect(left, y, w, 28, 8); ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, left + 11, y + 15);
+      ctx.textBaseline = 'alphabetic';
+    }
+
+    function drawMitt(x, y, scale) {
+      ctx.save();
+      ctx.translate(x, y); ctx.scale(scale, scale);
+      ctx.fillStyle = '#78350f';
+      ctx.beginPath(); ctx.ellipse(0, 2, 22, 24, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b45309';
+      ctx.beginPath(); ctx.ellipse(0, 3, 14, 16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#451a03'; ctx.lineWidth = 2;
+      for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * 9, -20); ctx.lineTo(i * 6, -10); ctx.stroke(); }
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(0, 3, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(-4, 3, 5.5, -0.9, 0.9); ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawSpeedGun() {
+      const sg = gameState.speedGun;
+      if (!sg) return;
+      const pop = Math.min(1, sg.t / 0.2);
+      ctx.save();
+      ctx.globalAlpha = pop;
+      ctx.fillStyle = 'rgba(2,6,23,0.88)'; roundRect(612, 14, 172, 74, 10); ctx.fill();
+      ctx.strokeStyle = '#f97316'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 11px "Chakra Petch", monospace'; ctx.fillStyle = '#fdba74';
+      ctx.fillText('SPEED GUN', 626, 32);
+      ctx.font = 'bold 38px "Chakra Petch", monospace'; ctx.fillStyle = sg.kmh >= 150 ? '#f87171' : '#fde047';
+      ctx.fillText(String(sg.kmh), 626, 72);
+      ctx.font = 'bold 15px "Chakra Petch", monospace'; ctx.fillStyle = '#e2e8f0';
+      ctx.fillText('km/h', 700, 72);
+      ctx.font = 'bold 13px "Do Hyeon", sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right';
+      ctx.fillText(sg.name, 772, 32);
+      ctx.restore();
+    }
+
+    // ----- 선수 그리기 (포수 시점) -----
+    const TEAM_ME = '#34d399', TEAM_AI = '#38bdf8';
+    const SKIN = '#f5d0a9', PANTS = '#f1f5f9';
+
+    function limb(points, width, color) {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.stroke();
+      ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    }
+
+    function drawHead(x, y, r, capColor, faceDir) {
+      ctx.fillStyle = SKIN;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = capColor;
+      ctx.beginPath(); ctx.arc(x, y - r * 0.15, r * 1.05, Math.PI, 0); ctx.fill();
+      ctx.fillRect(faceDir > 0 ? x : x - r * 1.6, y - r * 0.3, r * 1.6, r * 0.28); // 모자챙
+    }
+
+    // ----- 선수 애니메이션: 키 포즈 사이를 부드럽게 이어 붙입니다 -----
+    const ease = t => t * t * (3 - 2 * t);
+    const easeOut = t => 1 - (1 - t) * (1 - t);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    function lerpPose(A, B, t) {
+      const o = {};
+      for (const k in A) o[k] = [lerp(A[k][0], B[k][0], t), lerp(A[k][1], B[k][1], t)];
+      return o;
+    }
+
+    // 두 마디 팔: 어깨와 손 위치로 팔꿈치 위치를 구합니다 (팔꿈치는 아래쪽으로 굽힘).
+    function elbowIK(sh, hand, l1, l2) {
+      const dx = hand[0] - sh[0], dy = hand[1] - sh[1];
+      const d = clamp(Math.hypot(dx, dy), 1, l1 + l2 - 0.5);
+      const base = Math.atan2(dy, dx), off = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1));
+      const c1 = [sh[0] + Math.cos(base + off) * l1, sh[1] + Math.sin(base + off) * l1];
+      const c2 = [sh[0] + Math.cos(base - off) * l1, sh[1] + Math.sin(base - off) * l1];
+      return c1[1] > c2[1] ? c1 : c2;
+    }
+
+    // 투수 키 포즈 (u: +면 던지는 팔 쪽, v: 발끝 기준 높이, 키 ≈ 95)
+    // bf/bk: 축발·무릎, ff/fk: 내딛는 발·무릎, te/th: 던지는 팔 팔꿈치·손, ge/gh: 글러브 팔
+    const POSE_P = {
+      SET:     { bf: [7, 0], bk: [7, 22], ff: [-7, 0], fk: [-7, 22], hip: [0, 45], chest: [0, 75], head: [0, 88], te: [12, 62], th: [3, 58], ge: [-12, 62], gh: [-2, 58] },
+      LIFT:    { bf: [5, 0], bk: [5, 22], ff: [-9, 27], fk: [-14, 44], hip: [1, 46], chest: [1, 77], head: [1, 90], te: [9, 65], th: [1, 68], ge: [-9, 65], gh: [0, 68] },
+      COCK:    { bf: [8, 0], bk: [11, 20], ff: [-20, 2], fk: [-17, 24], hip: [2, 40], chest: [1, 69], head: [0, 82], te: [20, 70], th: [27, 86], ge: [-17, 70], gh: [-25, 67] },
+      RELEASE: { bf: [11, 7], bk: [9, 23], ff: [-19, 0], fk: [-15, 21], hip: [-2, 38], chest: [-3, 65], head: [-4, 78], te: [14, 75], th: [7, 86], ge: [-12, 60], gh: [-7, 56] },
+      FOLLOW:  { bf: [13, 22], bk: [9, 31], ff: [-17, 0], fk: [-13, 19], hip: [-4, 36], chest: [-8, 57], head: [-9, 69], te: [-5, 50], th: [-15, 40], ge: [-14, 58], gh: [-8, 54] },
+    };
+    const P_SC = 0.62, P_X = 400, P_FOOT = 210;
+    const throwSide = () => (pitcherHand() === 'R' ? -1 : 1); // 우투수 오른팔 = 포수가 보기에 화면 왼쪽
+    function pitcherHandPoint(pose) { return [P_X + throwSide() * pose.th[0] * P_SC, P_FOOT - pose.th[1] * P_SC]; }
+
+    // 게이지 도는 동안 다리 들기 → (멈추면) 팔 뒤로 → 공 놓기 → 팔로스루 → 천천히 준비 자세로
+    function currentPitcherPose() {
+      const p = gameState.pitch, t = gameState.pitcherT;
+      if (gameState.phase === 'METER_RUNNING') {
+        const k = ease(Math.min(1, gameState.meterT / 0.4));
+        const pose = lerpPose(POSE_P.SET, POSE_P.LIFT, k);
+        const bob = k * Math.sin(gameState.meterT * 5) * 1.2; // 다리를 든 채 균형 잡기
+        pose.ff = [pose.ff[0], pose.ff[1] + bob]; pose.fk = [pose.fk[0], pose.fk[1] + bob];
+        return pose;
+      }
+      if (p.active && !p.released) {
+        const d = p.deliveryT / DELIVERY;
+        return d < 0.55 ? lerpPose(POSE_P.LIFT, POSE_P.COCK, ease(d / 0.55)) : lerpPose(POSE_P.COCK, POSE_P.RELEASE, ease((d - 0.55) / 0.45));
+      }
+      if (t < 0.4) return lerpPose(POSE_P.RELEASE, POSE_P.FOLLOW, easeOut(t / 0.4));
+      if (t < 1.0) return POSE_P.FOLLOW;
+      if (t < 1.5) return lerpPose(POSE_P.FOLLOW, POSE_P.SET, ease((t - 1.0) / 0.5));
+      return POSE_P.SET;
+    }
+
+    function drawPitcherFigure() {
+      const pose = currentPitcherPose(), a = throwSide(), p = gameState.pitch;
+      const P = ([u, v]) => [P_X + a * u * P_SC, P_FOOT - v * P_SC];
+      const jersey = userDefending() ? TEAM_ME : TEAM_AI;
+      const chest = P(pose.chest);
+      const tS = [chest[0] + a * 6, chest[1] + 1], gS = [chest[0] - a * 6, chest[1] + 1];
+      limb([P(pose.bf), P(pose.bk), P(pose.hip)], 5, PANTS);
+      limb([P(pose.ff), P(pose.fk), P(pose.hip)], 5, PANTS);
+      limb([gS, P(pose.ge), P(pose.gh)], 4, jersey);
+      limb([P(pose.hip), chest], 11, jersey);
+      limb([tS, P(pose.te), P(pose.th)], 4, jersey);
+      const g = P(pose.gh);
+      ctx.fillStyle = '#78350f'; ctx.beginPath(); ctx.arc(g[0], g[1], 4.5, 0, Math.PI * 2); ctx.fill();
+      const holding = (p.active && !p.released) || ['SET_TARGET', 'METER_RUNNING', 'SETUP', 'CHANGE'].includes(gameState.phase);
+      if (holding) {
+        const h = P(pose.th);
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(h[0], h[1], 2.5, 0, Math.PI * 2); ctx.fill();
+      }
+      const hd = P(pose.head);
+      drawHead(hd[0], hd[1], 6, '#0f172a', 0);
+    }
+
+    // 타자 몸 키 포즈 (u: +면 홈플레이트 쪽, 키 ≈ 95). 손과 배트는 화면 좌표로 따로 계산합니다.
+    const POSE_B = {
+      STANCE:  { bf: [-14, 0], bk: [-11, 22], ff: [16, 0], fk: [13, 22], hip: [0, 44], chest: [-2, 74], head: [-1, 88] },
+      LOAD:    { bf: [-14, 0], bk: [-12, 22], ff: [11, 7], fk: [9, 27], hip: [-3, 44], chest: [-5, 74], head: [-4, 88] },
+      CONTACT: { bf: [-12, 2], bk: [-6, 20], ff: [23, 0], fk: [18, 22], hip: [3, 43], chest: [4, 72], head: [2, 86] },
+      FOLLOW:  { bf: [-9, 7], bk: [-3, 22], ff: [23, 0], fk: [19, 22], hip: [5, 44], chest: [7, 73], head: [5, 87] },
+      BUNT:    { bf: [-6, 0], bk: [-4, 24], ff: [14, 0], fk: [12, 26], hip: [3, 41], chest: [6, 68], head: [7, 82] },
+    };
+    const B_SC = 2.5, B_FOOT = 552, BAT_LEN = 105, CONTACT_FRAME = 4;
+
+    // 준비 → (공이 오면) 체중 싣기 → 스윙: 임팩트 지점에서 배트가 노림수를 지나고 → 팔로스루
+    function currentBatterPose() {
+      const b = gameState.batter, s = batterHand() === 'R' ? 1 : -1;
+      const bx = 400 - s * 150;
+      const toS = ([u, v]) => [bx + s * u * B_SC, B_FOOT - v * B_SC];
+      // 배트 각도는 우타 기준(라디안, 화면 y는 아래쪽이 +)으로 보간한 뒤 좌타면 좌우를 뒤집습니다.
+      const contactHands = [b.aimX - s * 62, b.aimY + 14];
+      let cAng = Math.atan2(b.aimY - contactHands[1], b.aimX - contactHands[0]);
+      if (s < 0) cAng = Math.PI - cAng;
+      if (cAng > Math.PI) cAng -= Math.PI * 2;
+      const K = {
+        STANCE: { body: POSE_B.STANCE, hands: toS([-10, 82]), ang: -2.0, len: 1 },
+        LOAD: { body: POSE_B.LOAD, hands: toS([-15, 84]), ang: -2.15, len: 1 },
+        CONTACT: { body: POSE_B.CONTACT, hands: contactHands, ang: cAng, len: 1 },
+        FOLLOW: { body: POSE_B.FOLLOW, hands: toS([13, 90]), ang: -2.9, len: 0.8 },
+      };
+      const mix = (A, B, t) => ({
+        body: lerpPose(A.body, B.body, t),
+        hands: [lerp(A.hands[0], B.hands[0], t), lerp(A.hands[1], B.hands[1], t)],
+        ang: lerp(A.ang, B.ang, t), len: lerp(A.len, B.len, t),
+      });
+      let k;
+      if (b.isSwinging || b.holdFollow) {
+        const f = b.isSwinging ? b.swingFrame : b.maxSwingFrames;
+        const from = mix(K.STANCE, K.LOAD, b.swingFrom);
+        if (f <= CONTACT_FRAME) k = mix(from, K.CONTACT, ease(f / CONTACT_FRAME));
+        else {
+          const t = easeOut((f - CONTACT_FRAME) / (b.maxSwingFrames - CONTACT_FRAME));
+          k = mix(K.CONTACT, K.FOLLOW, t);
+          k.len *= 1 - 0.5 * Math.sin(Math.PI * t); // 몸을 감아 돌 때 배트가 화면 안쪽으로 들어가 짧아 보입니다
+        }
+      } else k = mix(K.STANCE, K.LOAD, ease(b.load || 0));
+      // 번트 자세: 몸을 투수 쪽으로 열고 배트를 수평으로 내밀어 노림수 위에 댑니다. 댈 때 살짝 밀어 줍니다.
+      const buntW = b.buntBlend || 0;
+      if (buntW > 0.001) {
+        const push = b.mode === 'BUNT' && b.isSwinging ? Math.sin(Math.PI * Math.min(1, b.swingFrame / 10)) * 12 : 0;
+        const bh = [b.aimX - s * (48 - push), b.aimY + 6];
+        let bAng = Math.atan2(b.aimY - bh[1], b.aimX - bh[0]);
+        if (s < 0) bAng = Math.PI - bAng;
+        if (bAng > Math.PI) bAng -= Math.PI * 2;
+        k = mix(k, { body: POSE_B.BUNT, hands: bh, ang: bAng, len: 1 }, ease(buntW));
+      }
+      return { s, toS, body: k.body, hands: k.hands, ang: s > 0 ? k.ang : Math.PI - k.ang, len: k.len * BAT_LEN };
+    }
+
+    // 타자: 우타자는 화면 왼쪽, 좌타자는 화면 오른쪽 타석에 서서 홈플레이트 쪽을 봅니다.
+    function drawBatterFigure() {
+      const { s, toS, body, hands, ang, len } = currentBatterPose();
+      const jersey = aiIsBatting() ? TEAM_AI : TEAM_ME;
+      ctx.save();
+      ctx.globalAlpha = 0.97;
+      const chest = toS(body.chest);
+      const backSh = [chest[0] - s * 18, chest[1] + 4], frontSh = [chest[0] + s * 15, chest[1] + 4];
+      limb([toS(body.bf), toS(body.bk), toS(body.hip)], 13, PANTS);
+      limb([toS(body.ff), toS(body.fk), toS(body.hip)], 13, PANTS);
+      limb([backSh, elbowIK(backSh, hands, 40, 40), hands], 9, jersey);
+      limb([toS(body.hip), chest], 30, jersey);
+      const mid = [hands[0] + Math.cos(ang) * len * 0.4, hands[1] + Math.sin(ang) * len * 0.4];
+      const tip = [hands[0] + Math.cos(ang) * len, hands[1] + Math.sin(ang) * len];
+      limb([hands, mid], 5, '#b45309');   // 손잡이
+      limb([mid, tip], 9, '#d97706');     // 배럴
+      limb([frontSh, elbowIK(frontSh, hands, 40, 40), hands], 9, jersey);
+      ctx.fillStyle = SKIN; ctx.beginPath(); ctx.arc(hands[0], hands[1], 6, 0, Math.PI * 2); ctx.fill();
+      const hd = toS(body.head);
+      drawHead(hd[0], hd[1], 20, '#0f172a', s); // 헬멧
+      ctx.fillStyle = jersey; ctx.fillRect(hd[0] - 3, hd[1] - 22, 6, 12);   // 헬멧 줄무늬
+      ctx.restore();
+    }
+
+    // 투구 궤적: 날아오는 동안은 공 뒤로 꼬리, 공이 들어간 뒤에는 다음 공까지 전체 경로를 점선으로 남깁니다.
+    function drawPitchTrail() {
+      const p = gameState.pitch;
+      const tr = p.active ? p.trail : gameState.lastTrail;
+      if (!tr || tr.length < 2 || (p.active && !p.released)) return;
+      ctx.save();
+      ctx.lineCap = 'round'; ctx.strokeStyle = tr.color;
+      if (p.active) {
+        for (let i = 1; i < tr.length; i++) {
+          const k = i / tr.length;
+          const fast = clamp((p.kmh - 115) / 40, 0, 1); // 빠른 공일수록 꼬리가 밝고 굵게
+          ctx.globalAlpha = (0.1 + 0.4 * fast) + (0.3 + 0.3 * fast) * k; ctx.lineWidth = 1 + k * (4 + fast * 5);
+          ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+        }
+      } else {
+        ctx.globalAlpha = 0.55; ctx.lineWidth = 2.5; ctx.setLineDash([7, 6]);
+        ctx.beginPath(); tr.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = tr.color;
+        ctx.beginPath(); ctx.arc(tr[0].x, tr[0].y, 3, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 타격 타이밍 보조: 공 주위 접근 링(홈플레이트에 가까울수록 작아지고, 칠 수 있는 순간엔 초록) + 아래쪽 거리 막대
+    function drawTimingAid(p, radius) {
+      const w = SWING_MODES[gameState.batter.mode].window, d = p.progress - IDEAL_HIT_PROGRESS;
+      const now = Math.abs(d) <= w, left = Math.max(0, 1 - p.progress);
+      ctx.save();
+      ctx.strokeStyle = now ? '#4ade80' : 'rgba(255,255,255,0.75)';
+      ctx.lineWidth = now ? 4 : 2;
+      ctx.beginPath(); ctx.arc(p.ballX, p.ballY, radius + 4 + left * 80, 0, Math.PI * 2); ctx.stroke();
+      // 거리 막대: 투수 손(왼쪽) → 홈플레이트(초록 구간) → 포수 미트(오른쪽 끝)
+      const bx = 275, by = V_H - 34, bw = 250, bh = 12, at = v => bx + bw * clamp(v / CATCH_PROGRESS, 0, 1);
+      ctx.fillStyle = 'rgba(2,6,23,0.8)'; roundRect(bx - 8, by - 20, bw + 16, bh + 28, 8); ctx.fill();
+      ctx.fillStyle = '#334155'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = 'rgba(74,222,128,0.85)'; ctx.fillRect(at(1 - w), by, at(1 + w) - at(1 - w), bh);
+      ctx.fillStyle = now ? '#4ade80' : '#facc15'; ctx.fillRect(bx, by, at(p.progress) - bx, bh);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(at(1) - 1, by - 3, 2, bh + 6);
+      ctx.font = 'bold 14px "Do Hyeon", sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = now ? '#4ade80' : '#cbd5e1';
+      ctx.fillText(now ? '지금! 스윙!' : `홈까지 ${Math.round(left * 60.5)}ft`, bx, by - 6);
+      ctx.restore();
+    }
+
+    function renderPitchView() {
+      // 외야·내야·마운드·타석
+      ctx.fillStyle = '#064e3b'; fillFull(0, 240);
+      ctx.fillStyle = '#15803d'; fillFull(240, V_H - 240);
+      ctx.fillStyle = '#9a3412';
+      ctx.beginPath(); ctx.ellipse(400, 210, 68, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(400, 470, 195, 90, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f1f5f9';
+      ctx.beginPath();
+      ctx.moveTo(370, 500); ctx.lineTo(430, 500); ctx.lineTo(430, 512); ctx.lineTo(400, 526); ctx.lineTo(370, 512);
+      ctx.closePath(); ctx.fill();
+      drawPitcherFigure();
+
+      // 스트라이크 존 (항상 9칸 격자. 컨택트는 2×2칸, 강공은 1칸을 칠해서 보여줌)
+      const bq = gameState.batter;
+      const showQuad = bq.mode !== 'BUNT' && (gameState.myPlayerRole === 'BATTER' || gameState.pitch.active || bq.isSwinging || bq.holdFollow);
+      if (showQuad) {
+        // 고른 칸: 칠해진 칸 + 점선 = 여유까지 포함한 타격 범위 (AI 타자의 칸은 투구가 출발한 뒤에만 흐리게)
+        const q = cellRect(bq.quad.c, bq.quad.r, spanOf(bq.mode)), m = SWING_MODES[bq.mode].margin;
+        const col = bq.mode === 'POWER' ? '239, 68, 68' : '234, 179, 8';
+        const mine = gameState.myPlayerRole === 'BATTER';
+        ctx.fillStyle = `rgba(${col}, ${mine ? 0.28 : 0.14})`;
+        ctx.fillRect(q.x, q.y, q.w, q.h);
+        ctx.setLineDash([5, 5]); ctx.strokeStyle = `rgba(${col}, ${mine ? 0.9 : 0.45})`; ctx.lineWidth = 2;
+        ctx.strokeRect(q.x - m, q.y - m, q.w + m * 2, q.h + m * 2);
+        ctx.setLineDash([]);
+      }
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)'; ctx.lineWidth = 1.5;
+      for (let i = 1; i < GRID; i++) {
+        const gx = ZONE.x + CELL_W * i, gy = ZONE.y + CELL_H * i;
+        ctx.beginPath(); ctx.moveTo(gx, ZONE.y); ctx.lineTo(gx, ZONE.y + ZONE.h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ZONE.x, gy); ctx.lineTo(ZONE.x + ZONE.w, gy); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.7)'; ctx.lineWidth = 2.5;
+      ctx.strokeRect(ZONE.x, ZONE.y, ZONE.w, ZONE.h);
+
+      // 이번 타석 투구 위치 기록 (번호 = 몇 번째 공)
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      gameState.pitchLog.forEach(m => {
+        ctx.fillStyle = m.color; ctx.globalAlpha = 0.85;
+        ctx.beginPath(); ctx.arc(m.x, m.y, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1; ctx.fillStyle = '#0f172a'; ctx.font = 'bold 11px "Chakra Petch", monospace';
+        ctx.fillText(String(m.n), m.x, m.y + 1);
+      });
+      ctx.textBaseline = 'alphabetic';
+
+      // 포수 미트: 방금 잡은 위치에 쾅!
+      if (gameState.lastCatch && !gameState.pitch.active) {
+        const a = Math.max(0, gameState.catchAnim);
+        const lc = gameState.lastCatch;
+        if (a > 0) {
+          ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(lc.x, lc.y, 22 + (1 - a) * 30, 0, Math.PI * 2); ctx.stroke();
+        }
+        drawMitt(lc.x, lc.y, 1 + a * 0.25);
+      }
+
+      // 투수 탄착점 (내가 투수일 때만 보임)
+      if (gameState.myPlayerRole === 'PITCHER' && !isSpec() && ['SET_TARGET', 'METER_RUNNING'].includes(gameState.phase)) {
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(gameState.pitch.aimX, gameState.pitch.aimY, 18, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(gameState.pitch.aimX - 6, gameState.pitch.aimY); ctx.lineTo(gameState.pitch.aimX + 6, gameState.pitch.aimY);
+        ctx.moveTo(gameState.pitch.aimX, gameState.pitch.aimY - 6); ctx.lineTo(gameState.pitch.aimX, gameState.pitch.aimY + 6);
+        ctx.stroke();
+      }
+
+      // 번트 자세일 때만 번트 범위 상자 (일반 스윙은 위의 4구역 표시)
+      const b = gameState.batter;
+      const showAim = b.mode === 'BUNT' && (gameState.myPlayerRole === 'BATTER' || gameState.pitch.active || b.isSwinging);
+      if (showAim) {
+        ctx.globalAlpha = gameState.myPlayerRole === 'BATTER' ? 1 : 0.45;
+        ctx.strokeStyle = b.mode === 'POWER' ? '#ef4444' : '#eab308'; ctx.lineWidth = 2;
+        ctx.strokeRect(b.aimX - b.contactRadius, b.aimY - b.contactRadius, b.contactRadius * 2, b.contactRadius * 2);
+        ctx.globalAlpha = 1;
+      }
+
+      // 투구 궤적과 타자 (타자는 공보다 앞쪽, 궤적은 타자 뒤쪽)
+      drawPitchTrail();
+      drawBatterFigure();
+
+      // 투구 공 (투수 손을 떠난 뒤부터)
+      const p = gameState.pitch;
+      if (p.active && p.released) {
+        const radius = 7 * (0.35 + Math.min(p.progress, 1.1) * 1.25);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath(); ctx.ellipse(p.ballX, 250 + p.progress * 260, radius, radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+        // 빠른 공: 145km/h부터 공 뒤로 속도선, 150km/h부터 주황빛으로 달아오름
+        const fast = clamp((p.kmh - 145) / 12, 0, 1);
+        const tr = p.trail;
+        if (p.kmh >= 145 && tr.length > 3) {
+          const back = tr[Math.max(0, tr.length - 4)];
+          const dx = p.ballX - back.x, dy = p.ballY - back.y, d = Math.hypot(dx, dy) || 1;
+          const ux = dx / d, uy = dy / d, len = radius * (2.5 + fast * 4);
+          ctx.strokeStyle = `rgba(255,255,255,${0.35 + fast * 0.4})`; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+          [-0.7, 0, 0.7].forEach(off => {
+            const ox = -uy * radius * off, oy = ux * radius * off;
+            ctx.beginPath(); ctx.moveTo(p.ballX + ox - ux * radius, p.ballY + oy - uy * radius);
+            ctx.lineTo(p.ballX + ox - ux * (radius + len), p.ballY + oy - uy * (radius + len)); ctx.stroke();
+          });
+          ctx.lineCap = 'butt';
+        }
+        ctx.save();
+        if (p.kmh >= 150) { ctx.shadowColor = '#f97316'; ctx.shadowBlur = 10 + (p.kmh - 150) * 2; }
+        ctx.fillStyle = p.kmh >= 150 ? '#fff7ed' : '#ffffff';
+        ctx.beginPath(); ctx.arc(p.ballX, p.ballY, radius, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(p.ballX - radius * 0.5, p.ballY, radius * 0.7, -0.9, 0.9); ctx.stroke();
+        if (gameState.myPlayerRole === 'BATTER' || isSpec()) drawTimingAid(p, radius);
+      }
+
+      // 타구
+      const hb = gameState.hitBall;
+      if (hb.active) {
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(hb.x, hb.y, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath(); ctx.arc(hb.x, hb.y - hb.altitude, 9, 0, Math.PI * 2); ctx.fill();
+      }
+
+      drawSpeedGun();
+      // 도루 표시: 공격 측(내가 타자)은 바로, 수비 측은 공이 손을 떠난 뒤부터
+      const st = gameState.steal, attacking = gameState.myPlayerRole === 'BATTER';
+      if (st && (attacking || p.released)) {
+        const t = stealElapsed(), lead = Math.max(...st.bases);
+        const pct = Math.round(stealDistance(st.bases.indexOf(lead), t) / 90 * 100);
+        drawPill(`🏃 ${attacking || isSpec() ? '' : '상대 '}도루! ${st.bases.map(k => `${k}루→${k + 1}루`).join(', ')}  ${pct}%`, 400, 58, '#38bdf8', 'center');
+      }
+      const defend = gameState.myPlayerRole === 'PITCHER';
+      if (isSpec()) drawPill('📺 관전 중', 16 - OX, V_H - 44, '#e2e8f0');
+      else drawPill(defend ? '🧢 수비 중 · 내가 던집니다' : '🏏 공격 중 · 내가 칩니다', 16 - OX, V_H - 44, defend ? '#38bdf8' : '#f59e0b');
+      drawPill(`${handLabel(pitcherHand(), '투')} 투수 vs ${handLabel(batterHand(), '타')} 타자`, V_W + OX - 16, V_H - 44, '#e2e8f0', 'right');
+    }
+
+    // ----- 필드 시점 -----
+    function toScreen(x, y, z = 0) {
+      const c = play.cam;
+      return [400 + (x - c.cx) * c.s, 320 + (c.cy - y) * c.s * TILT - z * c.s * 0.9];
+    }
+
+    function worldPoly(points, fill, stroke, lw) {
+      ctx.beginPath();
+      points.forEach((p, i) => { const [sx, sy] = toScreen(p.x, p.y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+      ctx.closePath();
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 2; ctx.stroke(); }
+    }
+
+    function arcPoints(cx, cy, r, fromDeg, toDeg, step = 4) {
+      const pts = [];
+      const dir = toDeg >= fromDeg ? 1 : -1;
+      for (let a = fromDeg; dir > 0 ? a <= toDeg : a >= toDeg; a += step * dir) {
+        const q = polar(r, a); pts.push({ x: cx + q.x, y: cy + q.y });
+      }
+      return pts;
+    }
+
+    function fencePoints(inset = 0) {
+      const pts = [];
+      for (let a = -45; a <= 45; a += 3) pts.push(polar(fenceDist(a * Math.PI / 180) - inset, a));
+      return pts;
+    }
+
+    function drawFieldGround() {
+      ctx.fillStyle = '#0f172a'; fillFull(0, V_H);
+      // 파울 지역 잔디
+      worldPoly([{ x: -520, y: -60 }, { x: 520, y: -60 }, { x: 520, y: 520 }, { x: -520, y: 520 }], '#14532d');
+      // 관중석 (담장 뒤)
+      worldPoly([{ x: 0, y: 0 }, ...fencePoints(-60), { x: 0, y: 0 }], '#1e293b');
+      // 페어 지역 잔디 + 잔디 무늬
+      const fair = [{ x: 0, y: 0 }, ...fencePoints()];
+      ctx.save();
+      worldPoly(fair, '#15803d');
+      ctx.clip();
+      for (let r = 420; r > 0; r -= 30) {
+        worldPoly([{ x: 0, y: 0 }, ...arcPoints(0, 0, r, -50, 50)], (r / 30) % 2 ? '#16a34a' : '#15803d');
+      }
+      ctx.restore();
+      // 워닝 트랙과 담장
+      worldPoly([...fencePoints(), ...fencePoints(14).reverse()], '#a16207');
+      ctx.beginPath();
+      fencePoints().forEach((p, i) => { const [sx, sy] = toScreen(p.x, p.y); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+      ctx.strokeStyle = '#1e3a8a'; ctx.lineWidth = 7; ctx.stroke();
+      ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2; ctx.stroke();
+      // 내야 흙
+      worldPoly([{ x: 0, y: -14 }, polar(112, 45), ...arcPoints(0, 60.5, 95, 66, -66), polar(112, -45)], '#b45309');
+      // 내야 잔디
+      worldPoly([{ x: 0, y: 20 }, { x: 50, y: 63.64 }, { x: 0, y: 108 }, { x: -50, y: 63.64 }], '#16a34a');
+      // 마운드·홈 주변
+      worldPoly(arcPoints(0, 60.5, 9, 0, 360, 30), '#c2410c');
+      worldPoly(arcPoints(0, 0, 13, 0, 360, 30), '#c2410c');
+      // 파울 라인
+      [-45, 45].forEach(a => {
+        const end = polar(fenceDist(Math.PI / 4), a);
+        const [x0, y0] = toScreen(0, 0), [x1, y1] = toScreen(end.x, end.y);
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      });
+      // 담장 거리
+      ctx.font = 'bold 13px "Chakra Petch", monospace'; ctx.fillStyle = '#fde047'; ctx.textAlign = 'center';
+      [[-44, '330'], [0, '400'], [44, '330']].forEach(([a, t]) => {
+        const p = polar(fenceDist(a * Math.PI / 180) + 18, a); const [sx, sy] = toScreen(p.x, p.y);
+        ctx.fillText(t, sx, sy);
+      });
+      // 베이스
+      const bs = Math.max(5, play.cam.s * 3);
+      BASE_POS.forEach((bp, i) => {
+        const [sx, sy] = toScreen(bp.x, bp.y);
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath();
+        if (i === 0) { ctx.moveTo(sx - bs, sy - bs * 0.5); ctx.lineTo(sx + bs, sy - bs * 0.5); ctx.lineTo(sx + bs, sy); ctx.lineTo(sx, sy + bs * 0.7); ctx.lineTo(sx - bs, sy); }
+        else { ctx.moveTo(sx, sy - bs * TILT); ctx.lineTo(sx + bs, sy); ctx.lineTo(sx, sy + bs * TILT); ctx.lineTo(sx - bs, sy); }
+        ctx.closePath(); ctx.fill();
+      });
+    }
+
+    function drawPerson(x, y, color, label, opts = {}) {
+      const [sx, sy] = toScreen(x, y);
+      const r = 9;
+      ctx.globalAlpha = opts.alpha ?? 1;
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.ellipse(sx, sy + 2, r, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+      if (opts.ring) {
+        ctx.strokeStyle = '#fde047'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(sx, sy - r, r + 6, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#fde047';
+        ctx.beginPath(); ctx.moveTo(sx - 7, sy - r * 2 - 18); ctx.lineTo(sx + 7, sy - r * 2 - 18); ctx.lineTo(sx, sy - r * 2 - 8); ctx.closePath(); ctx.fill();
+      }
+      ctx.fillStyle = color; ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(sx, sy - r, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#0f172a'; ctx.font = 'bold 10px "Do Hyeon", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, sx, sy - r + 1);
+      ctx.textBaseline = 'alphabetic';
+      ctx.globalAlpha = 1;
+    }
+
+    function renderFieldView() {
+      const P = play, b = P.ball;
+      drawFieldGround();
+      const defColor = userDefending() ? '#34d399' : '#38bdf8';  // 수비팀 색 (나=초록, AI=하늘)
+      const offColor = userDefending() ? '#38bdf8' : '#34d399';
+
+      // 뜬공 낙하 예상 지점
+      if (b.state === 'FREE' && !P.touchedGround && !P.hr) {
+        const [sx, sy] = toScreen(P.landing.x, P.landing.y);
+        const pulse = 10 + Math.sin(P.t * 12) * 3;
+        ctx.strokeStyle = '#f87171'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.ellipse(sx, sy, pulse, pulse * TILT, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx - 6, sy - 5); ctx.lineTo(sx + 6, sy + 5); ctx.moveTo(sx + 6, sy - 5); ctx.lineTo(sx - 6, sy + 5); ctx.stroke();
+      }
+
+      // 송구 대기 중이면 베이스 번호 표시
+      if (P.awaitingThrow && userDefending() && !isSpec() && b.state === 'HELD' && !P.over) {
+        [1, 2, 3, 4].forEach(B => {
+          const bp = basePoint(B); const [sx, sy] = toScreen(bp.x, bp.y);
+          const target = P.runners.some(r => (r.state === 'RUN' || r.state === 'RETURN') && r.target === B);
+          ctx.fillStyle = target ? 'rgba(250,204,21,0.9)' : 'rgba(148,163,184,0.75)';
+          ctx.beginPath(); ctx.arc(sx, sy - 24, 12, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#0f172a'; ctx.font = 'bold 14px "Chakra Petch", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(String(B), sx, sy - 23);
+          ctx.textBaseline = 'alphabetic';
+        });
+      }
+
+      // 사람들: 뒤(먼 곳)부터 그립니다.
+      const people = [];
+      P.fielders.forEach((f, i) => people.push({ y: f.y, draw: () => drawPerson(f.x, f.y, defColor, f.label, { ring: userDefending() && !isSpec() && i === P.chaser && b.state === 'FREE' && !P.hr }) }));
+      P.runners.forEach(r => {
+        if (r.state === 'SCORED') return;
+        const pos = pathPos(r.s);
+        people.push({ y: pos.y, draw: () => drawPerson(pos.x, pos.y, r.state === 'OUT' ? '#64748b' : offColor, r.isBatter ? '타' : '주', { alpha: r.state === 'OUT' ? 0.45 : 1 }) });
+      });
+      people.sort((a, c) => c.y - a.y).forEach(p => p.draw());
+
+      // 공과 그림자
+      if (b.state !== 'GONE') {
+        const [gx, gy] = toScreen(b.x, b.y);
+        const [bx, by] = toScreen(b.x, b.y, b.z);
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.beginPath(); ctx.ellipse(gx, gy, 5, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+        const r = 4.5 + Math.min(6, b.z * 0.05) * (P.cam.s / 1.5);
+        ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(bx, by - 6, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+
+      // 아웃/세이프 팝업
+      P.popups.forEach(p => {
+        const [sx, sy] = toScreen(p.x, p.y);
+        ctx.globalAlpha = Math.min(1, p.life);
+        ctx.font = 'bold 26px "Do Hyeon", sans-serif'; ctx.textAlign = 'center';
+        ctx.lineWidth = 5; ctx.strokeStyle = '#020617'; ctx.strokeText(p.text, sx, sy - 34 - (1.4 - p.life) * 20);
+        ctx.fillStyle = p.color; ctx.fillText(p.text, sx, sy - 34 - (1.4 - p.life) * 20);
+        ctx.globalAlpha = 1;
+      });
+
+      // 조작 안내
+      const outsNow = Math.min(3, P.outsBefore + P.outs);
+      drawPill(`${gameState.inning}회${gameState.isTopInning ? '초' : '말'} · ${outsNow}아웃`, 16, 16, '#e2e8f0');
+      if (isSpec()) {
+        // 관전자는 안내 없음
+      } else if (userDefending() && !P.finished) {
+        if (P.awaitingThrow && b.state === 'HELD' && !P.over) {
+          const left = Math.max(0, P.decideTimer).toFixed(1);
+          drawPill(`송구! [1]1루 [2]2루 [3]3루 [4]홈 · 베이스 클릭 가능 (자동 ${left}초)`, 400, V_H - 50, '#fde047', 'center');
+        } else if (b.state === 'FREE' && !P.hr) {
+          drawPill(P.manual ? '🕹️ 직접 수비 중: 방향키로 공 밑으로!' : '방향키를 누르면 노란 표시 수비수를 직접 움직입니다 (지금은 자동)', 400, V_H - 50, '#38bdf8', 'center');
+        }
+      } else if (!P.finished) {
+        drawPill(`🏃 주자 자동 주루 중 · [S] 한 베이스 더! (수비는 ${oppName()})`, 400, V_H - 50, '#f59e0b', 'center');
+      }
+
+      // 시점 전환 번쩍임
+      if (P.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${P.flash * 0.7})`; fillFull(0, V_H); }
+    }
+
+    // ================== 심판 ==================
+    // 아웃이 나오면 오른쪽에서 뛰어 들어와 주먹을 내리꽂으며 "아웃!" → 웃긴 포즈 → 웃긴 동작으로 퇴장
+    const UMP_IN = 0.35, UMP_OUT_T = 1.6, UMP_DUR = 2.9;
+    function umpireCall(text) {
+      const u = gameState.ump;
+      if (u && u.t < UMP_OUT_T) { // 연속 아웃(병살)은 이미 나온 심판이 한 번 더 외칩니다
+        u.n++; u.text = text; u.t = Math.min(u.t, UMP_IN);
+        sound.playUmpire();
+        return;
+      }
+      const pick = a => a[Math.floor(Math.random() * a.length)];
+      gameState.ump = { t: 0, n: 1, text, pose: pick(['dance', 'point', 'flex']), exit: pick(['moonwalk', 'spin', 'hop', 'cartwheel']) };
+      sound.playUmpire();
+    }
+
+    function drawUmpire() {
+      const u = gameState.ump;
+      if (!u) return;
+      const t = u.t, S = play ? 1.6 : 2.1, footY = V_H - 40;
+      const xStand = V_W + OX - 110, xOff = V_W + OX + 90;
+      let x = xStand, dx = 0, dy = 0, rot = 0, flip = -1, lean = 0, legSwing = 0, shout = false;
+      let aF = Math.PI * 0.45, bF = 0.3, aR = Math.PI * 0.55, bR = -0.3; // 팔 각도(0=앞, -π/2=위)와 팔꿈치 굽힘
+      if (t < UMP_IN) { // 뛰어 들어오기
+        const w = Math.sin(t * 45);
+        x = lerp(xOff, xStand, easeOut(t / UMP_IN)); legSwing = w * 9; aF = Math.PI / 2 + w * 0.8; aR = Math.PI / 2 - w * 0.8; lean = 0.15;
+      } else if (t < UMP_OUT_T) {
+        const k = t - UMP_IN;
+        if (k < 0.22) { const e = ease(k / 0.22); aF = lerp(Math.PI / 2, -Math.PI * 0.55, e); bF = lerp(0.3, 0.2, e); } // 주먹 치켜들기
+        else if (k < 0.36) { const e = ease((k - 0.22) / 0.14); aF = lerp(-Math.PI * 0.55, -0.1, e); bF = lerp(0.2, -1.4, e); dy = 6 * e; shout = true; } // 내리꽂기 (팔꿈치 90도로 'ㄴ'자 아웃 사인)
+        else if (k < 0.8) { aF = -0.1 + Math.sin(k * 35) * 0.12; bF = -1.4; dy = 6; shout = k < 0.6; }
+        else { // 웃긴 포즈
+          const g = k - 0.8, w = Math.sin(g * 18);
+          if (u.pose === 'dance') { dx = w * 8; aF = -Math.PI * 0.6 + w * 0.5; aR = -Math.PI * 0.4 - w * 0.5; bF = bR = 0; legSwing = w * 5; }
+          else if (u.pose === 'point') { aF = -0.15; bF = 0; dx = Math.sin(g * 25) * 4; aR = Math.PI * 0.4; bR = 2.2; shout = true; }
+          else { aF = -0.2; bF = -2.2; aR = Math.PI + 0.2; bR = 2.2; dy = Math.sin(g * 20) * 2; } // 알통 자랑
+        }
+      } else { // 퇴장
+        const e = (t - UMP_OUT_T) / (UMP_DUR - UMP_OUT_T);
+        if (u.exit === 'moonwalk') { x = xStand + e * e * 300; legSwing = Math.sin(e * 28) * 10; lean = -0.12; aF = Math.PI * 0.35; aR = Math.PI * 0.65; }
+        else if (u.exit === 'spin') { x = xStand + e * e * 300; flip = -Math.cos(e * Math.PI * 7); aF = aR = -Math.PI / 2; bF = bR = 0; }
+        else if (u.exit === 'hop') { x = xStand + e * e * 300; dy = -Math.abs(Math.sin(e * Math.PI * 3)) * 45; aF = -Math.PI / 2 + Math.sin(e * 30) * 0.5; aR = -Math.PI / 2 - Math.sin(e * 30) * 0.5; }
+        else { x = xStand + e * e * 300; rot = e * Math.PI * 2.5; aF = aR = -Math.PI / 2; bF = bR = 0; legSwing = 12; } // 옆돌기
+      }
+
+      // 몸 (발끝 기준 로컬 좌표, +x = 보는 쪽)
+      const hip = [0, -42], ch = [lean * 20, -70], hd = [lean * 26, -86], sh = [ch[0], ch[1] + 4];
+      const arm = (a, b) => {
+        const el = [sh[0] + Math.cos(a) * 15, sh[1] + Math.sin(a) * 15];
+        return [sh, el, [el[0] + Math.cos(a + b) * 14, el[1] + Math.sin(a + b) * 14]];
+      };
+      const leg = f => [[f, 0], [(hip[0] + f) / 2 + 3, -21], hip];
+      ctx.save();
+      ctx.translate(x + dx, footY + dy);
+      if (rot) { ctx.translate(0, -42 * S); ctx.rotate(rot); ctx.translate(0, 42 * S); }
+      ctx.scale(S * flip, S);
+      limb(leg(-9 - legSwing), 7, '#6b7280');
+      limb(leg(9 + legSwing), 7, '#6b7280');
+      const rear = arm(aR, bR), front = arm(aF, bF);
+      limb(rear, 6, '#334155');
+      limb([hip, ch], 18, '#0f172a');                                             // 검은 심판복
+      ctx.fillStyle = '#475569'; roundRect(ch[0] + 3, ch[1] - 2, 8, 22, 3); ctx.fill(); // 가슴 보호대
+      limb(front, 6, '#334155');
+      [rear[2], front[2]].forEach(h => { ctx.fillStyle = SKIN; ctx.beginPath(); ctx.arc(h[0], h[1], 3.2, 0, Math.PI * 2); ctx.fill(); });
+      drawHead(hd[0], hd[1], 9, '#0f172a', 1);
+      ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 1.2;                           // 마스크 창살
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(hd[0] + 3 + i * 2.5, hd[1] - 4); ctx.lineTo(hd[0] + 3 + i * 2.5, hd[1] + 7); ctx.stroke(); }
+      if (shout) { ctx.fillStyle = '#7f1d1d'; ctx.beginPath(); ctx.ellipse(hd[0] + 5, hd[1] + 4, 2.5, 3.5, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+
+      // 말풍선
+      const k = t - UMP_IN;
+      if (k > 0.2 && k < 1.25) {
+        const label = u.n >= 2 ? ['', '', '더블 아웃!!', '트리플 아웃!!!'][Math.min(u.n, 3)] : u.text;
+        const pop = Math.min(1, (k - 0.2) / 0.12);
+        ctx.font = 'bold 38px "Do Hyeon", sans-serif';
+        const w0 = ctx.measureText(label).width + 34;
+        ctx.save();
+        ctx.translate(Math.min(x - 70, V_W + OX - w0 / 2 - 10), footY - 104 * S);
+        ctx.scale(pop, pop);
+        ctx.font = 'bold 38px "Do Hyeon", sans-serif';
+        const w = ctx.measureText(label).width + 34;
+        ctx.fillStyle = '#fef2f2';
+        roundRect(-w / 2, -52, w, 52, 14); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(22, -2); ctx.lineTo(52, 16); ctx.lineTo(38, -2); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 3;
+        roundRect(-w / 2, -52, w, 52, 14); ctx.stroke();
+        ctx.fillStyle = '#dc2626'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(label, 0, -25);
+        ctx.textBaseline = 'alphabetic';
+        ctx.restore();
+      }
+    }
+
+    // 공수 교대 연출: 위아래 색띠가 쓸고 지나가며 새 이닝과 내 역할을 크게 보여줍니다.
+    function drawChangeOverlay() {
+      const c = gameState.change;
+      const a = Math.min(1, c.t / 0.3, Math.max(0, (c.dur - c.t) / 0.35));
+      const e = 1 - Math.pow(1 - Math.min(1, c.t / 0.45), 3);
+      const defend = gameState.myPlayerRole === 'PITCHER';
+      const roleColor = defend ? '#38bdf8' : '#f59e0b';
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgba(2,6,23,0.85)'; fillFull(0, V_H);
+      ctx.fillStyle = roleColor;
+      ctx.fillRect(-OX, 170, CW * e, 10);
+      ctx.fillRect(-OX + CW * (1 - e), 430, CW * e, 10);
+      ctx.globalAlpha = a * 0.15;
+      fillFull(180, 250);
+      ctx.globalAlpha = a;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 24px "Do Hyeon", sans-serif'; ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(c.sub, 400, 222);
+      ctx.font = 'bold 84px "Do Hyeon", sans-serif'; ctx.fillStyle = '#facc15';
+      ctx.fillText(c.title, 400 - (1 - e) * 300, 305);
+      ctx.font = 'bold 34px "Do Hyeon", sans-serif'; ctx.fillStyle = roleColor;
+      const roleText = isSpec() ? `${gameState.isTopInning ? NET.names.away : NET.names.home} 공격` : defend ? '🧢 내가 수비 (투수)' : '🏏 내가 공격 (타자)';
+      ctx.fillText(`${gameState.inning}회${gameState.isTopInning ? '초' : '말'}  ${roleText}`, 400 + (1 - e) * 300, 362);
+      ctx.font = 'bold 22px "Do Hyeon", sans-serif'; ctx.fillStyle = '#e2e8f0';
+      ctx.fillText(`${NET.names.away} ${gameState.scoreAway}  :  ${gameState.scoreHome} ${NET.names.home}`, 400, 405);
+      ctx.restore();
+    }
+
+    function render() {
+      ctx.save();
+      if (gameState.shakeTimer > 0) ctx.translate((Math.random() * 8 - 4), (Math.random() * 8 - 4));
+      ctx.clearRect(0, 0, CW, V_H);
+      ctx.translate(OX, 0);
+      if (play) renderFieldView();
+      else renderPitchView();
+      // 구종·타격 모드 배지는 투구 화면에서만 보입니다.
+      const badges = $('pitchBadges');
+      badges.style.visibility = play ? 'hidden' : 'visible';
+
+      // 판정 피드백 텍스트 (투구 화면)
+      const fb = gameState.feedback;
+      if (fb.alpha > 0 && !play) {
+        ctx.globalAlpha = Math.min(1, fb.alpha);
+        ctx.font = 'bold 22px "Do Hyeon", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 4; ctx.strokeStyle = '#020617'; ctx.strokeText(fb.text, fb.x, fb.y);
+        ctx.fillStyle = fb.color; ctx.fillText(fb.text, fb.x, fb.y);
+        ctx.globalAlpha = 1;
+      }
+      drawUmpire();
+      if (gameState.change && gameState.phase === 'CHANGE') drawChangeOverlay();
+      ctx.restore();
+    }
+
+    // ================== 1대1 대전 ==================
+    // 호스트(홈)가 경기를 전부 계산해서 초당 30번 상태를 보냅니다. 원정·관전 화면은 그 상태를 그리기만 하고,
+    // 타이밍이 중요한 것(투구 비행, 원정 투수의 게이지, 원정 타자의 스윙 동작)만 자기 화면 시계로 돌립니다.
+    // ponytail: 호스트를 믿는 구조라 상태에 상대 구종·탄착점이 들어 있음 (개발자 도구로 볼 수 있음). 막으려면 서버 판정 필요.
+
+    function snapshot() {
+      const { pitch, lastTrail, ai, ...g } = gameState;
+      const { trail, ...p } = pitch;           // 궤적은 각 화면이 직접 그립니다
+      let pl = null;
+      if (play) { const { sim, ...rest } = play; pl = rest; } // 타구 계산 결과(sim)는 호스트만 필요
+      const events = NET.events;
+      NET.events = [];
+      return { g: { ...g, pitch: p }, play: pl, hands: { home: myHands, away: NET.awayHands }, events };
+    }
+
+    function applySnapshot(s) {
+      const g = s.g, lp = gameState.pitch, lb = gameState.batter;
+      const prevPhase = gameState.phase, prevRole = gameState.myPlayerRole;
+      // 원정은 호스트 반대편에서 봅니다 (역할·체력·상대 손을 뒤집음). 관전은 호스트 시점 그대로.
+      if (isGuest()) {
+        g.myPlayerRole = g.myPlayerRole === 'PITCHER' ? 'BATTER' : 'PITCHER';
+        g.stamina = { me: g.stamina.ai, ai: g.stamina.me };
+        g.aiPitcherHand = s.hands.home.throw;
+        g.aiBatterHand = s.hands.home.bat;
+      }
+      NET.viewHands = isGuest() ? s.hands.away : s.hands.home;
+      const role = g.myPlayerRole, sp = g.pitch;
+
+      // 투구 비행은 내 화면 시계로: 새 투구면 처음부터, 같은 투구면 내 진행 상태 유지
+      const keep = {};
+      if (sp.active && lp.id !== sp.id) {
+        Object.assign(keep, { deliveryT: 0, released: false, progress: 0, swung: false, takeSent: false, active: true, ballX: sp.startX, ballY: sp.startY });
+        lp.trail = [];
+        lp.trail.color = PITCHES[sp.type].color;
+        gameState.lastTrail = lp.trail;
+      } else if (sp.active && lp.active) {
+        ['deliveryT', 'released', 'progress', 'swung', 'takeSent', 'ballX', 'ballY'].forEach(k => { keep[k] = lp[k]; });
+      }
+      // 원정 투수: 고르는 중인 구종·탄착점·돌고 있는 게이지는 내 화면 것이 우선
+      const AIMING = ['SET_TARGET', 'METER_RUNNING'];
+      const aiming = isGuest() && role === 'PITCHER' && AIMING.includes(g.phase);
+      if (aiming && prevRole === 'PITCHER' && AIMING.includes(prevPhase)) Object.assign(keep, { type: lp.type, aimX: lp.aimX, aimY: lp.aimY });
+      if (aiming && NET.meter !== 'idle') {
+        g.phase = 'METER_RUNNING';
+        Object.assign(keep, { meterVal: lp.meterVal, meterDir: lp.meterDir, meterActive: lp.meterActive });
+      } else if (!aiming) NET.meter = 'idle';
+      Object.assign(lp, sp, keep);
+
+      // 원정 타자: 노리는 칸·스윙 동작은 내 것 (새 투구 준비 때 스윙 자세만 풉니다)
+      const { batter: sb, pitch, meterT, pitcherT, ...rest } = g;
+      if (isGuest() && role === 'BATTER' && prevRole === 'BATTER') {
+        if (g.phase === 'SET_TARGET' && prevPhase !== 'SET_TARGET') { lb.isSwinging = false; lb.holdFollow = false; }
+      } else {
+        const { load, buntBlend, ...b } = sb;
+        Object.assign(lb, b);
+      }
+      Object.assign(gameState, rest);
+      if (gameState.phase === 'METER_RUNNING' && prevPhase !== 'METER_RUNNING') gameState.meterT = 0;
+      play = s.play;
+
+      s.events.forEach(ev => (ev.k === 'alert' ? showAlert(ev.text, ev.duration) : sound[ev.m](...ev.a)));
+
+      updateScoreboard();
+      updateInstruction();
+      if (NET.meter !== 'running') {
+        const v = gameState.phase === 'SET_TARGET' ? 0 : lp.meterVal;
+        pitchMeterBar.style.width = `${v}%`;
+        meterMarker.style.left = `${v}%`;
+        if (gameState.phase === 'SET_TARGET') { pitcherQualityText.textContent = '대기 중'; pitcherQualityText.className = 'text-yellow-300'; }
+      }
+      const sg = gameState.speedGun;
+      selectedPitchBadge.textContent = role === 'PITCHER' && !isSpec()
+        ? `선택 구종: ${PITCHES[lp.type].name}`
+        : `${isSpec() ? '' : '상대 '}구종: ${sg ? `${sg.name} (${sg.kmh}km/h)` : '???'}`;
+      if (!(isGuest() && role === 'BATTER')) swingModeDom(lb.mode);
+      if (gameState.phase === 'GAME_OVER' && prevPhase !== 'GAME_OVER') showResult();
+    }
+
+    // 원정·관전 화면의 매 프레임: 투구 비행·게이지·타자 동작만 직접 움직입니다 (나머지는 호스트 상태).
+    function localTick() {
+      const p = gameState.pitch, b = gameState.batter;
+      if (NET.meter === 'running' && p.meterActive) meterTick(p);
+      gameState.meterT += STEP;
+      gameState.pitcherT += STEP;
+      if (p.active && !p.released) {
+        if ((p.deliveryT += STEP) >= DELIVERY) { p.released = true; gameState.pitcherT = 0; p.trail.push({ x: p.ballX, y: p.ballY }); }
+      } else if (p.active && p.progress < CATCH_PROGRESS) {
+        p.progress = Math.min(CATCH_PROGRESS, p.progress + p.speed);
+        const pos = pitchPosition(p, p.progress);
+        p.ballX = pos.x; p.ballY = pos.y;
+        p.trail.push(pos);
+      } else if (p.active && isGuest() && gameState.myPlayerRole === 'BATTER' && !p.swung && !p.takeSent) {
+        // 내 화면에서 공이 미트에 들어갈 때까지 안 쳤으면 "지켜봤다"고 알립니다.
+        p.takeSent = true;
+        netInput({ a: 'take', id: p.id });
+      }
+      if (b.isSwinging && ++b.swingFrame > b.maxSwingFrames) b.isSwinging = false;
+      const loadTarget = p.active && p.released && !p.swung ? clamp((p.progress - 0.3) / 0.4, 0, 1) : 0;
+      b.load = (b.load || 0) + (loadTarget - (b.load || 0)) * 0.25;
+      b.buntBlend = (b.buntBlend || 0) + ((b.mode === 'BUNT' ? 1 : 0) - (b.buntBlend || 0)) * 0.2;
+      if (gameState.ump) gameState.ump.t += STEP; // 심판 연출 (소리는 호스트가 보냄)
+    }
+
+    // 호스트: 원정 선수의 입력을 "원정 선수로서" 처리합니다 (NET.acting 동안 myRole()이 반대 역할).
+    function handleRemote(m) {
+      const p = gameState.pitch, b = gameState.batter;
+      NET.acting = true;
+      try {
+        switch (m.a) {
+          case 'meterStart':
+            if (!PITCHES[m.type] || myRole() !== 'PITCHER' || gameState.phase !== 'SET_TARGET') break;
+            selectPitchType(m.type, true);
+            p.aimX = clamp(+m.aimX || 0, ZONE.x - 40, ZONE.x + ZONE.w + 40);
+            p.aimY = clamp(+m.aimY || 0, ZONE.y - 40, ZONE.y + ZONE.h + 40);
+            startPitchMeter();
+            break;
+          case 'pitch':
+            if (!PITCHES[m.type] || myRole() !== 'PITCHER' || !['SET_TARGET', 'METER_RUNNING'].includes(gameState.phase)) break;
+            selectPitchType(m.type, true);
+            p.aimX = clamp(+m.aimX || 0, ZONE.x - 40, ZONE.x + ZONE.w + 40);
+            p.aimY = clamp(+m.aimY || 0, ZONE.y - 40, ZONE.y + ZONE.h + 40);
+            p.meterVal = clamp(+m.meter || 0, 0, 100);
+            p.meterActive = false;
+            launchPitch();
+            break;
+          case 'batter':
+            if (!SWING_MODES[m.mode] || myRole() !== 'BATTER' || p.swung) break;
+            if (b.mode !== m.mode) setSwingMode(m.mode);
+            setBatterQuad(m.c | 0, m.r | 0);
+            break;
+          case 'swing': {
+            if (!SWING_MODES[m.mode] || myRole() !== 'BATTER') break;
+            if (b.mode !== m.mode) setSwingMode(m.mode);
+            setBatterQuad(m.c | 0, m.r | 0);
+            const live = p.active && p.released && gameState.phase === 'PITCH_FLYING' && !p.swung;
+            if (m.progress == null) { if (!live) executeSwing(); break; } // 빈 스윙(연습)
+            if (!live || m.id !== p.id) break;
+            // 상대 화면에서 공이 있던 위치로 판정합니다.
+            p.progress = clamp(+m.progress || 0, 0, CATCH_PROGRESS);
+            const pos = pitchPosition(p, p.progress);
+            p.ballX = pos.x; p.ballY = pos.y;
+            p.remoteDone = true;
+            b.isSwinging = false;
+            executeSwing();
+            break;
+          }
+          case 'take': if (m.id === p.id) p.remoteDone = true; break;
+          case 'steal': userSteal(); break;
+          case 'throw': userThrow(m.B | 0); break;
+          case 'keys':
+            NET.remoteKeys = new Set((m.keys || []).filter(k => ARROWS.includes(k)));
+            if (play && gameState.phase === 'FIELD' && !userDefending() && NET.remoteKeys.size && play.ball.state === 'FREE') play.manual = true;
+            break;
+        }
+      } finally {
+        NET.acting = false;
+      }
+    }
+
+    // ----- 로비 -----
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    async function connectVersus() {
+      if (NET.ws) return;
+      const me = (await window.discordUser) || { name: '게스트', room: 'local' }; // main.js가 준비
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const ws = new WebSocket(`${proto}://${location.host}/ws?room=${encodeURIComponent(me.room)}&name=${encodeURIComponent(me.name)}`);
+      NET.ws = ws;
+      ws.onopen = () => netSend({ t: 'hands', hands: myHands });
+      ws.onmessage = e => { if (NET.ws === ws) onNetMessage(JSON.parse(e.data)); };
+      ws.onclose = () => {
+        if (NET.ws !== ws) return; // 내가 닫은 것
+        NET.ws = null;
+        openMenu();
+        showAlert('서버 연결이 끊겼습니다', 2500);
+      };
+      clearInterval(NET.ping);
+      NET.ping = setInterval(() => netSend({ t: 'ping' }), 25000); // 터널이 조용한 연결을 끊지 않게
+    }
+
+    function onNetMessage(m) {
+      if (m.t === 'hello') NET.id = m.id;
+      else if (m.t === 'lobby') onLobby(m);
+      else if (m.t === 'state') { if (isGuest() || isSpec()) applySnapshot(m.s); }
+      else if (m.t === 'input') { if (isHost()) handleRemote(m); }
+      else if (m.t === 'abort') showAlert(`${m.name} 님이 나가서 경기가 중단되었습니다`, 3000);
+    }
+
+    function onLobby(L) {
+      NET.lobby = L;
+      if (L.playing && !NET.side) enterMatch(L.home.id === NET.id ? 'home' : L.away.id === NET.id ? 'away' : 'spec', L);
+      else if (!L.playing && NET.side) exitMatch();
+      renderLobby();
+    }
+
+    function renderLobby() {
+      const L = NET.lobby;
+      if (!L) return;
+      const seat = (id, s, title) => {
+        const p = L[s], mine = p && p.id === NET.id;
+        $(id).innerHTML = `<span class="block text-xs ${s === 'home' ? 'text-emerald-300' : 'text-sky-300'} font-bold">${title}</span>
+          <span class="block text-base font-bold truncate">${p ? esc(p.name) + (mine ? ' (나)' : '') : '비어 있음'}</span>
+          <span class="block text-[11px] text-slate-400 font-sans">${p ? `${handLabel(p.hands.throw, '투')} · ${handLabel(p.hands.bat, '타')}${mine ? ' · 다시 누르면 일어나기' : ''}` : '눌러서 앉기'}</span>`;
+        $(id).className = `seat-btn rounded-xl border-2 p-2 text-left transition-all ${mine ? 'bg-slate-700 border-yellow-400' : p ? 'bg-slate-800 border-slate-600' : 'bg-slate-900 border-dashed border-slate-500 hover:bg-slate-800'}`;
+      };
+      seat('seatHome', 'home', '🏠 홈 · 1회초 수비');
+      seat('seatAway', 'away', '✈️ 원정 · 1회초 공격');
+      const seated = [L.home, L.away].some(p => p && p.id === NET.id);
+      $('lobbyStartBtn').disabled = !(seated && L.home && L.away);
+      $('lobbyStartBtn').textContent = L.home && L.away ? '경기 시작 ⚾' : '상대를 기다리는 중...';
+      $('lobbyList').textContent = `접속 ${L.players.length}명: ${L.players.map(p => p.name).join(', ')}`;
+    }
+
+    function clickSeat(s) {
+      const L = NET.lobby;
+      if (!L || L.playing) return;
+      const p = L[s];
+      if (p && p.id === NET.id) netSend({ t: 'sit', seat: null });
+      else if (!p) netSend({ t: 'sit', seat: s });
+      sound.playBeep(true);
+    }
+
+    const hideOverlays = () => ['menuModal', 'lobbyModal', 'setupModal', 'gameOverModal'].forEach(id => $(id).classList.add('hidden'));
+    function setScoreLabels() {
+      $('awayLabel').textContent = `${NET.names.away} (원정)`;
+      $('homeLabel').textContent = `${NET.names.home} (홈)`;
+    }
+    // 진행 중이던 경기(타이머·타구)를 멈추고 화면을 준비 상태로
+    function stopGame() {
+      gameState.token++;
+      play = null;
+      gameState.pitch.active = false;
+      gameState.change = null;
+      gameState.ump = null;
+      gameState.phase = 'SETUP';
+    }
+
+    function enterMatch(side, L) {
+      NET.side = side;
+      NET.names = { home: L.home.name, away: L.away.name };
+      NET.awayHands = L.away.hands;
+      NET.meter = 'idle';
+      NET.events = [];
+      NET.remoteKeys.clear();
+      hideOverlays();
+      $('modeSubtitle').textContent = side === 'spec' ? '📺 1대1 관전 중' : '⚔️ 1대1 대전';
+      setScoreLabels();
+      if (side === 'home') { NET.viewHands = null; resetGame(); return; }
+      // 원정·관전: 호스트의 첫 상태를 기다립니다
+      stopGame();
+      gameState.phase = 'CHANGE';
+      gameState.myPlayerRole = 'PITCHER'; // 원정 타자가 첫 상태에서 호스트의 타자 정보를 받아오도록
+      gameState.pitch.id = -1;
+      updateScoreboard();
+      updateInstruction();
+    }
+
+    function exitMatch() {
+      NET.side = null;
+      NET.viewHands = null;
+      NET.meter = 'idle';
+      NET.names = { home: '나', away: 'AI' };
+      stopGame();
+      setScoreLabels();
+      hideOverlays();
+      $('lobbyModal').classList.remove('hidden');
+      $('modeSubtitle').textContent = '⚔️ 1대1 대전 로비';
+      updateScoreboard();
+      updateInstruction();
+    }
+
+    function openMenu() {
+      const ws = NET.ws;
+      NET.ws = null;
+      if (ws) ws.close();
+      clearInterval(NET.ping);
+      NET.side = null;
+      NET.viewHands = null;
+      NET.lobby = null;
+      NET.names = { home: '나', away: 'AI' };
+      stopGame();
+      setScoreLabels();
+      hideOverlays();
+      $('menuModal').classList.remove('hidden');
+      $('modeSubtitle').textContent = 'AI 대전 · 1대1 대전';
+      updateScoreboard();
+      updateInstruction();
+    }
+
+    // 고정 시간 간격 루프: 60Hz든 144Hz든 게임 속도가 같습니다.
+    let lastTime = performance.now(), accumulator = 0;
+    function gameLoop(now) {
+      accumulator += Math.min(now - lastTime, 250);
+      lastTime = now;
+      while (accumulator >= FRAME_MS) {
+        if (isGuest() || isSpec()) localTick();
+        else updatePhysics();
+        accumulator -= FRAME_MS;
+      }
+      render();
+      if (isHost() && ++NET.frame % 2 === 0) netSend({ t: 'state', s: snapshot() }); // 30Hz
+      requestAnimationFrame(gameLoop);
+    }
+
+    // 키보드
+    const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+    window.addEventListener('keydown', (e) => {
+      // 버튼에 포커스가 남아 있으면 SPACE가 버튼까지 눌러버리므로 포커스를 풉니다.
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON') document.activeElement.blur();
+      if (['Space', ...ARROWS].includes(e.code)) e.preventDefault();
+      sound.init();
+      if (isSpec()) return;
+      if (ARROWS.includes(e.code)) {
+        keysDown.add(e.code);
+        if (isGuest() && !e.repeat) netInput({ a: 'keys', keys: [...keysDown] }); // 원정 수비수 직접 이동
+      }
+
+      // 수비 장면: 방향키로 수비수 이동, 1~4로 송구
+      if (gameState.phase === 'FIELD' && play) {
+        if (userDefending()) {
+          if (ARROWS.includes(e.code) && play.ball.state === 'FREE') play.manual = true;
+          const n = { Digit1: 1, Digit2: 2, Digit3: 3, Digit4: 4, Numpad1: 1, Numpad2: 2, Numpad3: 3, Numpad4: 4 }[e.code];
+          if (n && !e.repeat) userThrow(n);
+        } else if (e.code === 'KeyS' && !e.repeat) userSteal(); // 공격 측: 추가 진루
+        return;
+      }
+
+      const isBatter = gameState.myPlayerRole === 'BATTER';
+      const b = gameState.batter;
+      if (e.key === '1') selectPitchType('FASTBALL');
+      if (e.key === '2') selectPitchType('SLIDER');
+      if (e.key === '3') selectPitchType('CURVE');
+      if (e.key === '4') selectPitchType('FORK');
+      if (e.key === '5') selectPitchType('CHANGEUP');
+      if (e.key === '6') selectPitchType('CUTTER');
+      if (e.key === '7') selectPitchType('SINKER');
+      if (e.code === 'Space' && !e.repeat) {
+        if (!isBatter) {
+          if (gameState.phase === 'SET_TARGET') startPitchMeter();
+          else if (gameState.phase === 'METER_RUNNING') releasePitchMeter();
+        } else executeSwing();
+      }
+      if ((e.code === 'KeyZ' || e.key === 'Enter') && !e.repeat) executeSwing();
+      if (e.code === 'KeyX' && !e.repeat) toggleSwingMode();
+      if (e.code === 'KeyB' && !e.repeat) toggleBunt();
+      if (e.code === 'KeyS' && !e.repeat) userSteal();
+      if (isBatter) {
+        // 칸 선택: 방향키 한 번에 한 칸씩 (컨택트 4칸 / 강공 9칸)
+        if (e.key === 'ArrowLeft') setBatterQuad(b.quad.c - 1, b.quad.r);
+        if (e.key === 'ArrowRight') setBatterQuad(b.quad.c + 1, b.quad.r);
+        if (e.key === 'ArrowUp') setBatterQuad(b.quad.c, b.quad.r - 1);
+        if (e.key === 'ArrowDown') setBatterQuad(b.quad.c, b.quad.r + 1);
+        if (ARROWS.includes(e.code)) sendBatter();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (keysDown.delete(e.code) && isGuest()) netInput({ a: 'keys', keys: [...keysDown] });
+    });
+    window.addEventListener('blur', () => {
+      keysDown.clear();
+      if (isGuest()) netInput({ a: 'keys', keys: [] });
+    });
+
+    // 마우스·터치
+    canvas.addEventListener('pointerdown', (e) => {
+      sound.init();
+      if (isSpec()) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (CW / rect.width) - OX;
+      const y = (e.clientY - rect.top) * (V_H / rect.height);
+      if (gameState.phase === 'FIELD' && play) {
+        // 송구할 베이스를 클릭
+        if (!userDefending() || !play.awaitingThrow) return;
+        let best = 0, bd = 60;
+        [1, 2, 3, 4].forEach(B => {
+          const bp = basePoint(B); const [sx, sy] = toScreen(bp.x, bp.y);
+          const d = Math.hypot(sx - x, sy - 12 - y);
+          if (d < bd) { bd = d; best = B; }
+        });
+        if (best) userThrow(best);
+        return;
+      }
+      if (gameState.myPlayerRole === 'PITCHER') {
+        if (gameState.phase !== 'SET_TARGET') return;
+        gameState.pitch.aimX = clamp(x, ZONE.x - 40, ZONE.x + ZONE.w + 40);
+        gameState.pitch.aimY = clamp(y, ZONE.y - 40, ZONE.y + ZONE.h + 40);
+      } else if (gameState.phase === 'PITCH_FLYING') {
+        executeSwing();
+      } else {
+        const q = quadOf(x, y);
+        setBatterQuad(q.c, q.r);
+        sendBatter();
+      }
+    });
+
+    pitchBtnList.forEach(btn => btn.addEventListener('click', () => selectPitchType(btn.dataset.pitch)));
+    $('lockPitchBtn').addEventListener('click', startPitchMeter);
+    $('stopMeterBtn').addEventListener('click', releasePitchMeter);
+    swingModeBtn.addEventListener('click', toggleSwingMode);
+    $('buntBtn').addEventListener('click', toggleBunt);
+    $('stealBtn').addEventListener('click', userSteal);
+    $('swingHitBtn').addEventListener('click', () => executeSwing());
+    $('restartBtn').addEventListener('click', () => {
+      if (!versus()) return openSetup();
+      if (isSpec()) return $('gameOverModal').classList.add('hidden'); // 관전자는 선수들이 로비로 갈 때까지 대기
+      netSend({ t: 'end' }); // 모두 로비로
+    });
+    $('newGameBtn').addEventListener('click', openMenu);
+    $('startGameBtn').addEventListener('click', () => { sound.init(); startFromSetup(); });
+    $('menuAiBtn').addEventListener('click', () => {
+      sound.init();
+      hideOverlays();
+      $('modeSubtitle').textContent = '🤖 AI 봇과 3이닝 대결';
+      openSetup();
+    });
+    $('menuVsBtn').addEventListener('click', () => {
+      sound.init();
+      hideOverlays();
+      $('lobbyModal').classList.remove('hidden');
+      $('lobbyList').textContent = '서버에 연결 중...';
+      $('modeSubtitle').textContent = '⚔️ 1대1 대전 로비';
+      refreshHandButtons();
+      connectVersus();
+    });
+    $('lobbyBackBtn').addEventListener('click', openMenu);
+    $('lobbyStartBtn').addEventListener('click', () => netSend({ t: 'start' }));
+    $('seatHome').addEventListener('click', () => clickSeat('home'));
+    $('seatAway').addEventListener('click', () => clickSeat('away'));
+    document.querySelectorAll('.hand-btn').forEach(btn => btn.addEventListener('click', () => {
+      if (btn.dataset.throw) myHands.throw = btn.dataset.throw;
+      else myHands.bat = btn.dataset.bat;
+      try { localStorage.setItem('magumagu-hands', JSON.stringify(myHands)); } catch (e) {}
+      netSend({ t: 'hands', hands: myHands }); // 로비에 있으면 내 자리 정보 갱신
+      sound.playBeep(true);
+      refreshHandButtons();
+    }));
+    soundBtn.addEventListener('click', () => {
+      sound.enabled = !sound.enabled;
+      soundBtn.textContent = sound.enabled ? '🔊 소리 ON' : '🔇 소리 OFF';
+    });
+
+    // 화면 높이에 맞춰 캔버스 폭을 정합니다: 위아래 패널을 뺀 남은 높이 × 가로 비율 (한 화면에 다 들어오게)
+    function fitCanvas() {
+      const frame = $('canvasFrame');
+      const other = frame.parentElement.offsetHeight - frame.offsetHeight + 16; // + body 여백
+      frame.style.maxWidth = `${Math.floor(Math.max(240, innerHeight - other) * CW / V_H)}px`;
+    }
+    addEventListener('resize', fitCanvas);
+    document.querySelectorAll('details').forEach(d => d.addEventListener('toggle', fitCanvas));
+    document.fonts.ready.then(fitCanvas);
+    fitCanvas();
+
+    openMenu();
+    requestAnimationFrame(gameLoop);
+  </script>
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
