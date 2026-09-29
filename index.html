@@ -25,33 +25,34 @@
     #canvasFrame { transition: border-color 0.4s, box-shadow 0.4s; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-2 overflow-x-hidden">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-1 overflow-x-hidden">
 
-  <div class="w-full max-w-6xl flex flex-col items-center gap-2">
+  <div id="app" class="w-full flex flex-col items-center gap-1">
 
-    <!-- 헤더 -->
-    <header class="w-full flex items-center justify-between px-4 py-2 bg-slate-900 rounded-xl border border-slate-700 glow-box">
-      <div class="flex items-center gap-2">
-        <span class="text-3xl animate-bounce">⚾</span>
-        <div>
-          <h1 class="text-lg sm:text-xl text-yellow-400 font-bold tracking-wider hud-title">마구마구 야구</h1>
-          <p id="modeSubtitle" class="text-[11px] text-emerald-400">AI 대전 · 1대1 대전</p>
-        </div>
+   <!-- 게임 영역: 넓은 화면에선 [왼쪽 헤더 | 가운데 캔버스+게이지 | 오른쪽 점수판] (CSS order로 배치) -->
+   <div id="gameRow" class="w-full flex flex-col md:flex-row gap-1">
+
+    <!-- 헤더 (왼쪽) -->
+    <header class="md:order-1 md:w-36 shrink-0 flex md:flex-col items-center md:items-stretch justify-between md:justify-start gap-2 px-3 py-1 md:py-3 bg-slate-900 rounded-lg border border-slate-700 glow-box">
+      <div class="flex md:flex-col items-center md:items-start gap-2 md:gap-1">
+        <span class="text-lg md:text-3xl">⚾</span>
+        <h1 class="text-sm md:text-base text-yellow-400 font-bold tracking-wider hud-title">마구마구 야구</h1>
+        <p id="modeSubtitle" class="text-[11px] text-emerald-400">AI 대전 · 1대1 대전</p>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button id="newGameBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg border border-emerald-400 shadow transition-all">
+      <div class="flex md:flex-col items-center md:items-stretch gap-2">
+        <button id="newGameBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-2 py-0.5 rounded border border-emerald-400 shadow transition-all">
           🏠 메인
         </button>
-        <button id="soundBtn" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-xs text-yellow-400 border border-yellow-500/50 font-bold">
+        <button id="soundBtn" class="bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-xs text-yellow-400 border border-yellow-500/50 font-bold">
           🔊 소리 ON
         </button>
       </div>
     </header>
 
-    <!-- 스코어보드 & 상황판 -->
-    <div class="w-full bg-slate-900/95 rounded-xl p-3 border border-slate-700 flex flex-wrap items-center justify-between gap-3 shadow-md">
-      <div class="flex items-center gap-4">
+    <!-- 스코어보드 & 상황판 (오른쪽) -->
+    <div class="md:order-3 md:w-48 shrink-0 bg-slate-900/95 rounded-lg px-3 py-1 md:py-3 border border-slate-700 flex flex-wrap md:flex-col md:flex-nowrap items-center md:items-stretch justify-between md:justify-start gap-3 shadow-md">
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div class="flex flex-col">
           <div class="flex items-center gap-2">
             <span id="awayLabel" class="text-xs text-sky-400 w-24 font-bold truncate">AI (원정)</span>
@@ -63,7 +64,7 @@
           </div>
         </div>
 
-        <div class="h-10 w-[1px] bg-slate-700 hidden sm:block"></div>
+        <div class="h-10 w-[1px] bg-slate-700 hidden sm:block md:hidden"></div>
 
         <div class="flex flex-col text-xs font-sans">
           <div class="flex items-center gap-1.5">
@@ -115,28 +116,28 @@
       </div>
     </div>
 
-    <!-- 구속 게이지 + 투수 체력 -->
-    <div id="meterContainer" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 flex flex-col gap-1">
-      <div class="flex justify-between items-center text-xs">
-        <span class="text-slate-400 font-bold">구속 게이지: <span id="pitcherQualityText" class="text-yellow-300">대기 중</span></span>
-        <span class="text-[11px] text-slate-400 font-sans hidden sm:inline">많이 채울수록 빠른 공 · 세게 던질수록 체력 소모 ↑ · 체력이 낮으면 실투 ↑</span>
-      </div>
-      <div class="relative w-full h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-700">
+    <!-- 가운데: 캔버스 + (그 아래) 구속 게이지 -->
+    <div id="gameCenter" class="md:order-2 flex-1 min-w-0 flex flex-col gap-1">
+
+    <!-- 구속 게이지 + 투수 체력 (order-last로 캔버스 아래 표시) -->
+    <div id="meterContainer" class="order-last w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" title="많이 채울수록 빠른 공 · 세게 던질수록 체력 소모 ↑ · 체력이 낮으면 실투 ↑">
+      <span class="text-slate-400 font-bold shrink-0">구속: <span id="pitcherQualityText" class="text-yellow-300">대기 중</span></span>
+      <div class="relative flex-[2] min-w-[120px] h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-700">
         <div id="pitchMeterBar" class="h-full bg-gradient-to-r from-sky-600 via-yellow-400 to-red-500 w-0"></div>
         <div id="meterMarker" class="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_8px_#ffffff] left-0 pointer-events-none"></div>
       </div>
-      <div class="flex items-center gap-2 text-xs mt-0.5">
-        <span id="staminaLabel" class="text-slate-400 font-bold w-24 shrink-0">내 투수 체력</span>
+      <div class="flex flex-1 min-w-[160px] items-center gap-2">
+        <span id="staminaLabel" class="text-slate-400 font-bold shrink-0">내 투수 체력</span>
         <div class="relative flex-1 h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-700">
           <div id="staminaBar" class="h-full bg-emerald-500 transition-all" style="width:100%"></div>
         </div>
-        <span id="staminaText" class="digital-font text-slate-200 w-16 text-right shrink-0">100</span>
+        <span id="staminaText" class="digital-font text-slate-200 whitespace-nowrap text-right shrink-0">100</span>
       </div>
     </div>
 
     <!-- 캔버스 화면 (테두리 색: 수비=하늘색, 공격=주황색) -->
-    <div id="canvasFrame" class="relative w-full mx-auto aspect-[26/15] bg-slate-900 rounded-xl overflow-hidden border-4 border-sky-500 shadow-2xl flex items-center justify-center">
-      <canvas id="gameCanvas" width="1040" height="600" class="w-full h-full block cursor-pointer"></canvas>
+    <div id="canvasFrame" class="relative w-full mx-auto aspect-[26/15] bg-slate-900 rounded-xl overflow-hidden border-2 border-sky-500 shadow-2xl flex items-center justify-center">
+      <canvas id="gameCanvas" width="1040" height="600" class="w-full h-full block cursor-pointer touch-none"></canvas>
       <div class="crt-scanline absolute inset-0"></div>
 
       <div id="alertBanner" class="absolute top-5 px-5 py-2 rounded-xl bg-black/90 border-2 border-yellow-400 text-yellow-300 font-bold text-sm sm:text-base tracking-wider opacity-0 transition-opacity duration-200 pointer-events-none text-center shadow-2xl">
@@ -230,59 +231,52 @@
       </div>
     </div>
 
+    </div><!-- /gameCenter -->
+   </div><!-- /gameRow -->
+
     <!-- 컨트롤 패널 -->
-    <div class="w-full grid grid-cols-1 md:grid-cols-2 gap-2 bg-slate-900/90 rounded-xl p-3 border border-slate-700">
-      <div id="pitcherPanel" class="flex flex-col gap-1.5 p-2 bg-slate-950/80 rounded-lg border border-slate-800 transition-opacity">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-bold text-sky-400 flex items-center gap-1">
-            <span>🧢</span> [수비] 투구 & 수비
-          </span>
-          <span class="text-[10px] text-slate-400 font-sans">[1~7] 구종 / 클릭=탄착점</span>
-        </div>
-
-        <div class="grid grid-cols-4 gap-1.5">
-          <button data-pitch="FASTBALL" class="pitch-btn text-xs py-1.5 rounded font-bold border">1. 직구</button>
-          <button data-pitch="SLIDER" class="pitch-btn text-xs py-1.5 rounded font-bold border">2. 슬라이더</button>
-          <button data-pitch="CURVE" class="pitch-btn text-xs py-1.5 rounded font-bold border">3. 커브</button>
-          <button data-pitch="FORK" class="pitch-btn text-xs py-1.5 rounded font-bold border">4. 포크</button>
-          <button data-pitch="CHANGEUP" class="pitch-btn text-xs py-1.5 rounded font-bold border">5. 체인지업</button>
-          <button data-pitch="CUTTER" class="pitch-btn text-xs py-1.5 rounded font-bold border">6. 커터</button>
-          <button data-pitch="SINKER" class="pitch-btn text-xs py-1.5 rounded font-bold border">7. 투심</button>
-        </div>
-
-        <div class="flex items-center gap-2 mt-1">
-          <button id="lockPitchBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 rounded text-xs transition-colors">🎯 게이지 시작 (SPACE)</button>
-          <button id="stopMeterBtn" class="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1.5 rounded text-xs transition-colors">⏹️ 게이지 멈추기 (SPACE)</button>
-        </div>
-
-        <details class="text-[11px] text-slate-400 font-sans bg-slate-900 p-1.5 rounded border border-slate-800"><summary class="cursor-pointer text-slate-300 font-bold">❓ 조작법 보기</summary>
+    <div class="w-full grid grid-cols-1 md:grid-cols-2 gap-1 bg-slate-900/90 rounded-lg p-1 border border-slate-700">
+      <div id="pitcherPanel" class="flex flex-col gap-1 px-2 py-1 bg-slate-950/80 rounded-lg border border-slate-800 transition-opacity">
+        <details class="text-[11px] text-slate-400 font-sans"><summary class="cursor-pointer flex items-center justify-between">
+          <span class="text-xs font-bold text-sky-400">🧢 [수비] 투구 & 수비 <span class="text-slate-300">❓</span></span>
+          <span class="text-[10px] text-slate-400">[1~7] 구종 / 클릭=탄착점</span></summary>
           * 타구가 나가면 필드 화면으로 바뀝니다. <b class="text-sky-300">방향키</b>로 노란 표시 수비수를 움직이고(가만두면 자동),
           공을 잡으면 <b class="text-sky-300">1=1루 2=2루 3=3루 4=홈</b> 또는 베이스 클릭으로 송구하세요. 2루 → 1루로 이어 던지면 병살!
         </details>
-      </div>
 
-      <div id="batterPanel" class="flex flex-col gap-1.5 p-2 bg-slate-950/80 rounded-lg border border-slate-800 transition-opacity">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-bold text-amber-400 flex items-center gap-1">
-            <span>🏏</span> [공격] 구역 노림 & 타격
-          </span>
-          <span class="text-[10px] text-slate-400 font-sans">방향키=구역 / [Z]=스윙 / [X]=모드</span>
+        <div class="grid grid-cols-7 gap-1">
+          <button data-pitch="FASTBALL" class="pitch-btn text-xs py-1 rounded font-bold border">1. 직구</button>
+          <button data-pitch="SLIDER" class="pitch-btn text-xs py-1 rounded font-bold border">2. 슬라이더</button>
+          <button data-pitch="CURVE" class="pitch-btn text-xs py-1 rounded font-bold border">3. 커브</button>
+          <button data-pitch="FORK" class="pitch-btn text-xs py-1 rounded font-bold border">4. 포크</button>
+          <button data-pitch="CHANGEUP" class="pitch-btn text-xs py-1 rounded font-bold border">5. 체인지업</button>
+          <button data-pitch="CUTTER" class="pitch-btn text-xs py-1 rounded font-bold border">6. 커터</button>
+          <button data-pitch="SINKER" class="pitch-btn text-xs py-1 rounded font-bold border">7. 투심</button>
         </div>
 
         <div class="flex items-center gap-2">
-          <button id="swingModeBtn" class="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs py-1.5 rounded font-bold transition-all">타격모드: 컨택트 [X]</button>
-          <button id="buntBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-amber-200 text-xs py-1.5 rounded font-bold transition-all border border-amber-500/50">🙇 번트 자세 [B]</button>
-          <button id="stealBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-sky-200 text-xs py-1.5 rounded font-bold transition-all border border-sky-500/50">🏃 도루·추가진루 [S]</button>
-          <button id="swingHitBtn" class="flex-1 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-bold py-1.5 rounded text-xs transition-all shadow-md">💥 스윙! [Z / SPACE]</button>
+          <button id="lockPitchBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1 rounded text-xs transition-colors">🎯 게이지 시작 (SPACE)</button>
+          <button id="stopMeterBtn" class="flex-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1 rounded text-xs transition-colors">⏹️ 게이지 멈추기 (SPACE)</button>
         </div>
+      </div>
 
-        <details class="text-[11px] text-slate-400 font-sans bg-slate-900 p-1.5 rounded border border-slate-800"><summary class="cursor-pointer text-slate-300 font-bold">❓ 조작법 보기</summary>
+      <div id="batterPanel" class="flex flex-col gap-1 px-2 py-1 bg-slate-950/80 rounded-lg border border-slate-800 transition-opacity">
+        <details class="text-[11px] text-slate-400 font-sans"><summary class="cursor-pointer flex items-center justify-between">
+          <span class="text-xs font-bold text-amber-400">🏏 [공격] 구역 노림 & 타격 <span class="text-slate-300">❓</span></span>
+          <span class="text-[10px] text-slate-400">방향키=구역 / [Z]=스윙 / [X]=모드</span></summary>
           * 존은 9칸입니다. 컨택트는 2×2칸 크기 사각형, 강공(X로 전환)은 1칸을 방향키(한 번에 한 칸)나 클릭으로 골라 두고,
           공이 그 안에 들어올 때 타이밍 맞춰 Z! 강공은 범위가 작은 대신 장타가 잘 나옵니다. 날아오는 중에 화면을 클릭해도 스윙합니다.
           칸 가운데일수록 정타, 공이 칸 위쪽이면 뜬공·아래쪽이면 땅볼, 일찍 치면 당겨치기·늦으면 밀어치기.
           번트 자세에서는 공이 올 때 Z로 배트를 대면 약하게 굴러갑니다 (공 아래를 대면 뜨고, 2스트라이크 번트 파울은 삼진).
           도루(S)는 공이 투수 손을 떠나기 전에 거세요. 느린 공일 때 뛰면 살기 쉽고, 치면 히트앤드런이 됩니다.
         </details>
+
+        <div class="flex items-center gap-2">
+          <button id="swingModeBtn" class="flex-1 bg-amber-600 hover:bg-amber-500 text-slate-950 text-xs py-1 rounded font-bold transition-all">타격모드: 컨택트 [X]</button>
+          <button id="buntBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-amber-200 text-xs py-1 rounded font-bold transition-all border border-amber-500/50">🙇 번트 자세 [B]</button>
+          <button id="stealBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-sky-200 text-xs py-1 rounded font-bold transition-all border border-sky-500/50">🏃 도루·추가진루 [S]</button>
+          <button id="swingHitBtn" class="flex-1 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-bold py-1 rounded text-xs transition-all shadow-md">💥 스윙! [Z / SPACE]</button>
+        </div>
       </div>
     </div>
 
@@ -3061,12 +3055,26 @@
     });
 
     // 마우스·터치
+    function canvasPoint(e) {
+      const rect = canvas.getBoundingClientRect();
+      return [(e.clientX - rect.left) * (CW / rect.width) - OX, (e.clientY - rect.top) * (V_H / rect.height)];
+    }
+    function setAim(x, y) {
+      gameState.pitch.aimX = clamp(x, ZONE.x - 40, ZONE.x + ZONE.w + 40);
+      gameState.pitch.aimY = clamp(y, ZONE.y - 40, ZONE.y + ZONE.h + 40);
+    }
+    let aimDragging = false; // 투수 탄착점: 누른 채 끌면 따라 움직임
+    canvas.addEventListener('pointermove', (e) => {
+      if (aimDragging && gameState.phase === 'SET_TARGET') setAim(...canvasPoint(e));
+    });
+    const endAimDrag = () => { aimDragging = false; };
+    canvas.addEventListener('pointerup', endAimDrag);
+    canvas.addEventListener('pointercancel', endAimDrag);
+
     canvas.addEventListener('pointerdown', (e) => {
       sound.init();
       if (isSpec()) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * (CW / rect.width) - OX;
-      const y = (e.clientY - rect.top) * (V_H / rect.height);
+      const [x, y] = canvasPoint(e);
       if (gameState.phase === 'FIELD' && play) {
         // 송구할 베이스를 클릭
         if (!userDefending() || !play.awaitingThrow) return;
@@ -3081,8 +3089,9 @@
       }
       if (gameState.myPlayerRole === 'PITCHER') {
         if (gameState.phase !== 'SET_TARGET') return;
-        gameState.pitch.aimX = clamp(x, ZONE.x - 40, ZONE.x + ZONE.w + 40);
-        gameState.pitch.aimY = clamp(y, ZONE.y - 40, ZONE.y + ZONE.h + 40);
+        setAim(x, y);
+        aimDragging = true;
+        canvas.setPointerCapture(e.pointerId); // 캔버스 밖으로 끌어도 계속 추적
       } else if (gameState.phase === 'PITCH_FLYING') {
         executeSwing();
       } else {
@@ -3141,7 +3150,8 @@
     // 화면 높이에 맞춰 캔버스 폭을 정합니다: 위아래 패널을 뺀 남은 높이 × 가로 비율 (한 화면에 다 들어오게)
     function fitCanvas() {
       const frame = $('canvasFrame');
-      const other = frame.parentElement.offsetHeight - frame.offsetHeight + 16; // + body 여백
+      // 게임 영역 밖(컨트롤 패널) 높이 + 가운데 칸에서 캔버스를 뺀 높이(게이지) + body 여백 (p-1)
+      const other = $('app').offsetHeight - $('gameRow').offsetHeight + $('gameCenter').offsetHeight - frame.offsetHeight + 8;
       frame.style.maxWidth = `${Math.floor(Math.max(240, innerHeight - other) * CW / V_H)}px`;
     }
     addEventListener('resize', fitCanvas);
